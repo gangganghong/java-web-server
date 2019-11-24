@@ -44,88 +44,58 @@ public class Server {
                 InputStream inputStream = socket.getInputStream();
                 byte[] buffer = new byte[1024];
                 inputStream.read(buffer);
-//                String msg = new String(buffer);
-//                System.out.println(msg);
-//                System.out.println("=========================");
                 ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
                 InputStreamReader requestInputStreamReader = new InputStreamReader(byteArrayInputStream);
                 BufferedReader bufferedReader = new BufferedReader(requestInputStreamReader);
                 String requestLine = bufferedReader.readLine();
-                if(requestLine == null){
-//                    return;
-                }
                 System.out.println("=========================requestLine start");
                 System.out.println(requestLine + "\t" + Thread.currentThread());
                 System.out.println("=========================requestLine end");
 
-//                GET /2015110214261032002.jpg HTTP/1.1
-
 //                获取文件路径
                 String[] requestLineArr = requestLine.split(" ");
-                if(requestLineArr.length < 2){
-//                    return;
-                }
                 String filename = requestLineArr[1];
                 System.out.println(filename);
 
-//                GET /2015110214261032002.jpg HTTP/1.1
-//                Host: localhost:2000
-//                Connection: keep-alive
-//                Pragma: no-cache
-//                Cache-Control: no-cache
-//                Upgrade-Insecure-Requests: 1
-//                User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36
-//                Sec-Fetch-User: ?1
-//                Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3
-//                Sec-Fetch-Site: none
-//                Sec-Fetch-Mode: navigate
-//                Accept-Encoding: gzip, deflate, br
-//                Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
-
-
-
-
-
+                String fileType = getFileType(filename);
                 OutputStream outputStream = socket.getOutputStream();
                 StringBuffer stringBuffer = new StringBuffer();
-                stringBuffer.append("HTTP/1.1 200 OK\n");
-                String fileType = getFileType(filename);
-                stringBuffer.append("Content-Type: " + fileType + "; charset=UTF-8\n");
-                stringBuffer.append("Connection: closed\n");
 
                 // 读取磁盘文件
                 File file = new File("/Users/cg/data/code/wheel/java/demo/html" + filename);
-                stringBuffer.append("Content-Length: " + file.length() + "\n");
-//                java.net.SocketException: Broken pipe (Write failed)
-//                stringBuffer.append("Transfer-Encoding: chunked\n");
+                if(file.exists()){
+                    stringBuffer.append("HTTP/1.1 200 OK\n");
 
-                FileInputStream fileInputStream = new FileInputStream(file);
+                    stringBuffer.append("Content-Type: " + fileType + "; charset=UTF-8\n");
+                    stringBuffer.append("Connection: closed\n");
 
-                if(fileType == "image/jpeg"){
+                    stringBuffer.append("Content-Length: " + file.length() + "\n");
+
                     stringBuffer.append("\n");
                     outputStream.write(stringBuffer.toString().getBytes());
-                    System.out.println(111111);
-                    int len = 0;
+
+                    FileInputStream fileInputStream = new FileInputStream(file);
+
+                    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+
+                    int len;
                     byte[] buf = new byte[1024];
                     while ((len = fileInputStream.read(buf)) != -1){
-                        outputStream.write(buf, 0, len);
+                        dataOutputStream.write(buf, 0, len);
                     }
+                    fileInputStream.close();
+                    bufferedReader.close();
+                    dataOutputStream.close();
+
                 }else{
-                    System.out.println(222222);
+                    stringBuffer.append("HTTP/1.1 404 Not Found\n");
                     stringBuffer.append("\n");
-                    InputStreamReader inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8");
-                    while (inputStreamReader.ready()) {
-                        stringBuffer.append((char) inputStreamReader.read());
-//                        outputStream.write(inputStreamReader.read());
-                    }
                     outputStream.write(stringBuffer.toString().getBytes());
+
+                    bufferedReader.close();
                 }
 
-                outputStream.flush();
-                System.out.println("文件输出结束");
-                System.out.println("thread status:\t" + Thread.currentThread().isAlive());
-                sleep(5000);
-//                socket.shutdownOutput();
+                socket.close();
             } catch (Exception e) {
                 e.printStackTrace();
             }
