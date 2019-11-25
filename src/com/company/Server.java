@@ -8,6 +8,8 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Server {
     private final String webServerRoot = "/Users/cg/data/code/wheel/java/demo/html";
@@ -23,7 +25,7 @@ public class Server {
             while (true) {
                 Socket socket = serverSocket.accept();
                 if (socket != null) {
-                    new WorkThread(socket).start();
+                    new WorkThread(socket).run();
                 }
             }
         } catch (IOException e) {
@@ -31,7 +33,7 @@ public class Server {
         }
     }
 
-    private class WorkThread extends Thread {
+    private class WorkThread {
         private Socket socket;
 
         public WorkThread(Socket socket) {
@@ -43,14 +45,15 @@ public class Server {
 //            this.socket = socket;
 //        }
 
-        @Override
         public void run() {
             System.out.println("工作线程\t" + Thread.currentThread() + "\t" + socket + "\t处理请求\t" + System.currentTimeMillis());
             try {
                 InputStream inputStream = socket.getInputStream();
                 byte[] buffer = new byte[1];
 
-                FileOutputStream fileOutputStream = new FileOutputStream(webServerRoot + "/tmp" + System.currentTimeMillis() + ".jpg");
+                FileOutputStream fileOutputStream = new FileOutputStream(webServerRoot + "/tmp" + System.currentTimeMillis());
+                FileOutputStream fileOutputStream1 = new FileOutputStream(webServerRoot + "/log" + System.currentTimeMillis());
+
                 int len2;
                 int i = 0;
                 boolean in = false;
@@ -59,32 +62,45 @@ public class Server {
                 boolean startEntity = false;
                 boolean startBinary = false;
                 boolean startFile = false;
+                int preAsciiCode = 0;
+                int prePreAsciiCode = 0;
+                boolean firstCrlf = false;
+                StringBuffer tmpBuffer = new StringBuffer();
+                Map<String, Map> fileMetas = new HashMap<>();
                 while ((len2 = inputStream.read(buffer)) != -1) {
 
-                    if(i > 80000){
-                        break;
-                    }
+                    fileOutputStream1.write(buffer);
+
+//                    if(i > 25){
+//
+//                        break;
+//                    }
+//                    i++;
 
                     String lineStr = new String();
+                    String preLineStr = new String();
                     String line = new String(buffer, 0, len2);
-//                    System.out.println(line);
                     int asciiCode = Integer.parseInt(stringToAscii(line));
+
+
+
                     if (in == false && ((65 <= asciiCode && asciiCode <= 90) || asciiCode == 45)) {
                         in = true;
                     }
-                    if (in == true && asciiCode == 13) {
+                    if (in == true && asciiCode == 10) {
                         in = false;
                         lineStr = stringBuffer.toString();
 //                        System.out.println("lineStr\t" + lineStr);
                         stringBuffer = new StringBuffer();
                     }
-                    if (asciiCode == 10) {
-                        startEntity = true;
-                    }
+
 
                     if (in) {
                         stringBuffer.append(line);
                     }
+
+
+
                     if (lineStr.startsWith("Content-Type")) {
                         String[] lienArr = lineStr.split(";");
                         if (lienArr[0].endsWith("multipart/form-data")) {
@@ -92,44 +108,89 @@ public class Server {
                         }
                     }
 
-                    if (startEntity && !boundary.isEmpty()) {
+                    if (!startBinary && !boundary.isEmpty()) {
 
                         if (!lineStr.isEmpty() && lineStr.startsWith("-") && lineStr.contains(boundary)) {
-                            System.out.println("startBinary start====================");
-                            System.out.println(lineStr);
-                            System.out.println(stringToAscii(lineStr));
-                            System.out.println(boundary);
-                            System.out.println("startBinary end====================");
+//                            System.out.println("startBinary start====================");
+//                            System.out.println(lineStr);
+//                            System.out.println(stringToAscii(lineStr));
+//                            System.out.println(boundary);
+//                            System.out.println("startBinary end====================");
                             startBinary = true;
                         }
                     }
 
-                    if (startBinary) {
-//                        System.out.println("startFile start=================");
-//                        System.out.println(lineStr);
-//                        System.out.println(asciiCode);
-//                        System.out.println("startFile end=================");
-                        if (asciiCode == 10) {
-                            startFile = true;
-//                            System.out.println("startFile start=================");
-//                            System.out.println(line);
-//                            System.out.println("startFile end=================");
+                    Map<String, String> fileMeta = new HashMap<>();
+                    if(startBinary){
+
+//                        获取下面的信息
+//                        Content-Disposition: form-data; name="picture"; filename="tooopen_sy_10140314310699.jpg"
+//                        Content-Type: image/jpeg
+
+                        if(lineStr.contains("Content-Disposition")){
+                            System.out.println("Content-Disposition start====================");
+                            System.out.println(lineStr);
+                            System.out.println(preAsciiCode);
+                            System.out.println(asciiCode);
+                            System.out.println("Content-Disposition end====================");
+                            fileMeta = parseFileMeta(lineStr, fileMeta);
+                        }
+
+                        if(lineStr.contains("Content-Type")){
+                            System.out.println("Content-Type start====================");
+                            System.out.println(lineStr);
+                            System.out.println(preAsciiCode);
+                            System.out.println(asciiCode);
+                            System.out.println("Content-Type end====================");
+                            fileMeta = parseFileMeta(lineStr, fileMeta);
+                        }
+
+                        if(!fileMeta.isEmpty()){
+                            fileMetas.put(fileMeta.get("name"), fileMeta);
+                        }
+
+                        if ((firstCrlf == false) && (asciiCode == 10 && preAsciiCode == 13 && prePreAsciiCode == 10)) {
+
+                            firstCrlf = true;
+
+                            prePreAsciiCode = preAsciiCode;
+                            preAsciiCode = asciiCode;
+
                             continue;
                         }
+//
+//                        System.out.println("检查换行符 start====================");
+//                        System.out.println(lineStr);
+//                        System.out.println(preAsciiCode);
+//                        System.out.println(asciiCode);
+//                        System.out.println("检查换行符 end====================");
                     }
 
-                    if (startFile) {
-                        fileOutputStream.write(buffer);
-//                        System.out.println("写入 tmp 结束");
-//                        if(i > 9000){
-//                            break;
-//                        }
-//                        System.out.println(lineStr);
+                    /**
+                     * 遇到可疑字符，暂存起来，检查无误后，再集中写入文件
+                     */
+//                    if(asciiCode == 45 && preAsciiCode == 45){
+//
+//                        tmpBuffer.append(buffer);
+//                    }
+
+
+                    if(prePreAsciiCode == 13 && preAsciiCode == 10 && asciiCode == 45){
+                        firstCrlf = false;
                     }
+
+                    if (firstCrlf) {
+                        fileOutputStream.write(buffer);
+                    }
+
+                    prePreAsciiCode = preAsciiCode;
+                    preAsciiCode = asciiCode;
 
                 }
 
                 System.out.println("结束");
+
+                System.out.println(fileMetas);
 //
 //                ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
 //                InputStreamReader requestInputStreamReader = new InputStreamReader(byteArrayInputStream);
@@ -277,6 +338,19 @@ public class Server {
                 }
             }
             return sbu.toString();
+        }
+
+        public Map<String, String> parseFileMeta(String line, Map<String, String> fileMeta){
+            String[] lineArr = line.split(";");
+            for(String e : lineArr){
+                String[] eArr = e.split("=");
+                if(eArr.length == 1){
+                    eArr = e.split(":");
+                }
+                fileMeta.put(eArr[0], eArr[1].replaceAll("\"", ""));
+            }
+
+            return fileMeta;
         }
     }
 }
