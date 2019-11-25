@@ -23,11 +23,12 @@ public class WorkThread {
     public void run() {
         System.out.println("工作线程\t" + Thread.currentThread() + "\t" + socket + "\t处理请求\t" + System.currentTimeMillis());
         try {
+
             InputStream inputStream = socket.getInputStream();
             byte[] buffer = new byte[1];
 
             FileOutputStream fileOutputStream = null;
-            FileOutputStream fileOutputStream1 = new FileOutputStream(webServerRoot + "/log" + System.currentTimeMillis());
+//            FileOutputStream fileOutputStream1 = new FileOutputStream(webServerRoot + "/log" + System.currentTimeMillis());
 
             int len2;
             int i = 0;
@@ -43,15 +44,11 @@ public class WorkThread {
             StringBuffer tmpBuffer = new StringBuffer();
             HashMap<String, HashMap> fileMetas = new HashMap<>();
             HashMap<String, String> fileMeta = new HashMap<>();
+
+
             while ((len2 = inputStream.read(buffer)) != -1) {
 
-                fileOutputStream1.write(buffer);
-
-//                    if(i > 25){
-//
-//                        break;
-//                    }
-//                    i++;
+//                fileOutputStream1.write(buffer);
 
                 String lineStr = new String();
                 String preLineStr = new String();
@@ -94,20 +91,20 @@ public class WorkThread {
 //                        Content-Type: image/jpeg
 
                     if (lineStr.contains("Content-Disposition")) {
-                        System.out.println("Content-Disposition start====================");
-                        System.out.println(lineStr);
-                        System.out.println(preAsciiCode);
-                        System.out.println(asciiCode);
-                        System.out.println("Content-Disposition end====================");
+//                        System.out.println("Content-Disposition start====================");
+//                        System.out.println(lineStr);
+//                        System.out.println(preAsciiCode);
+//                        System.out.println(asciiCode);
+//                        System.out.println("Content-Disposition end====================");
                         fileMeta = parseFileMeta(lineStr, fileMeta);
                     }
 
                     if (lineStr.contains("Content-Type")) {
-                        System.out.println("Content-Type start====================");
-                        System.out.println(lineStr);
-                        System.out.println(preAsciiCode);
-                        System.out.println(asciiCode);
-                        System.out.println("Content-Type end====================");
+//                        System.out.println("Content-Type start====================");
+//                        System.out.println(lineStr);
+//                        System.out.println(preAsciiCode);
+//                        System.out.println(asciiCode);
+//                        System.out.println("Content-Type end====================");
                         fileMeta = parseFileMeta(lineStr, fileMeta);
                     }
 
@@ -129,70 +126,99 @@ public class WorkThread {
 
                         continue;
                     }
-                }
+
+                    if (prePreAsciiCode == 13 && preAsciiCode == 10 && asciiCode == 45) {
+                        firstCrlf = false;
+                        fileOutputStream.close();
 
 
-                if (prePreAsciiCode == 13 && preAsciiCode == 10 && asciiCode == 45) {
-                    firstCrlf = false;
+                    }
                 }
 
                 if (firstCrlf) {
                     fileOutputStream.write(buffer);
                 }
 
+                if(asciiCode == 10 && preAsciiCode == 13 && prePreAsciiCode == 45){
+                    OutputStream outputStream = socket.getOutputStream();
+                    doPost(outputStream);
+                    outputStream.flush();
+                    outputStream.close();
+                    break;
+                }
+
                 prePreAsciiCode = preAsciiCode;
                 preAsciiCode = asciiCode;
             }
 
+
+            System.out.println(fileMetas);
+
+
+
+
+//            关闭后，浏览器异常，不能收到返回
+
             fileOutputStream.close();
-            fileOutputStream1.close();
+//            fileOutputStream1.close();
             inputStream.close();
+
+            socket.close();
 
             System.out.println("结束");
 
-            System.out.println(fileMetas);
+//            System.out.println(fileMetas);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private void doPost(String entityBody) throws IOException {
+    private void doPost(OutputStream outputStream) throws IOException {
         System.out.println("POST 请求");
-        String decodedEntityBody = URLDecoder.decode(entityBody, "UTF-8");
-        System.out.println("decodedEntityBody start");
-        System.out.println(decodedEntityBody);
-        System.out.println("decodedEntityBody end");
-        String[] decodedEntityBodyArr = decodedEntityBody.split("=");
-        System.out.println(decodedEntityBodyArr[0] + "\t" + decodedEntityBodyArr[1]);
+//        String decodedEntityBody = URLDecoder.decode(entityBody, "UTF-8");
+//        System.out.println("decodedEntityBody start");
+//        System.out.println(decodedEntityBody);
+//        System.out.println("decodedEntityBody end");
+//        String[] decodedEntityBodyArr = decodedEntityBody.split("=");
+//        System.out.println(decodedEntityBodyArr[0] + "\t" + decodedEntityBodyArr[1]);
         StringBuffer stringBuffer = new StringBuffer();
         stringBuffer.append("HTTP/1.1 200 OK\n");
-        stringBuffer.append("Content-Type: text/html" + "; charset=UTF-8\n");
+//        stringBuffer.append("Content-Type: text/html" + "; charset=UTF-8\n");
 
-        byte[] decodedEntityBodyBuff = decodedEntityBody.getBytes();
-        int valueLength = decodedEntityBodyBuff.length;
+//        byte[] decodedEntityBodyBuff = decodedEntityBody.getBytes();
+//        int valueLength = decodedEntityBodyBuff.length;
+//
+//        Map<String, String> entityBodyMap = parseEntityBody(decodedEntityBody);
+//        Set<String> names = entityBodyMap.keySet();
+//        String keyValueStr = "";
+//        for (String name : names) keyValueStr += name + ":" + entityBodyMap.get(name) + "\n";
+//        byte[] keyValueStrBuff = keyValueStr.getBytes();
+//        int keyValueStrLength = keyValueStrBuff.length;
 
-        Map<String, String> entityBodyMap = parseEntityBody(decodedEntityBody);
-        Set<String> names = entityBodyMap.keySet();
-        String keyValueStr = "";
-        for (String name : names) keyValueStr += name + ":" + entityBodyMap.get(name) + "\n";
-        byte[] keyValueStrBuff = keyValueStr.getBytes();
-        int keyValueStrLength = keyValueStrBuff.length;
+        String keyValueStr = new String("hello");
+        String html = "<html><head><title>cg</title></head><body><p>I am cg!</p></body></html>" + (char) 10 + (char) 13;
+        int keyValueStrLength = keyValueStr.getBytes().length;
+        stringBuffer.append("Content-Length: " + html.getBytes().length + "\n");
+//        stringBuffer.append("Transfer-Encoding: chunked"  + (char)10 + (char)13);
+        stringBuffer.append("Content-Type: text/html; charset=UTF-8" + (char) 10 + (char) 13);
+        stringBuffer.append("Connection: closed" + (char)10 + (char)13);
+        stringBuffer.append("" + (char) 10 + (char) 13);
+//        stringBuffer.append(keyValueStr);
+//
+//
+//        String st2 = new String("管理员");
+//        System.out.println(st2.length());
+//        System.out.println(valueLength);
+//        stringBuffer.append("------WebKitFormBoundaryIqmAOK1WzKVEtB5o" + (char)10 + (char)13);
 
-        stringBuffer.append("Content-Length: " + keyValueStrLength + "\n");
-        stringBuffer.append("\n");
-
-        stringBuffer.append(keyValueStr);
-
-
-        String st2 = new String("管理员");
-        System.out.println(st2.length());
-        System.out.println(valueLength);
-
-        OutputStream outputStream = socket.getOutputStream();
+        stringBuffer.append(html);
+//        stringBuffer.append("------WebKitFormBoundaryIqmAOK1WzKVEtB5o--");
 
         outputStream.write(stringBuffer.toString().getBytes());
 
-        outputStream.close();
+        System.out.println(stringBuffer.toString());
+
+        System.out.println("post end");
     }
 
     private void doGet(BufferedReader bufferedReader, String filename) throws IOException {
