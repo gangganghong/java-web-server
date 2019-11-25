@@ -48,40 +48,115 @@ public class Server {
             System.out.println("工作线程\t" + Thread.currentThread() + "\t" + socket + "\t处理请求\t" + System.currentTimeMillis());
             try {
                 InputStream inputStream = socket.getInputStream();
-                byte[] buffer = new byte[1024];
-                int lenth = inputStream.read(buffer);
-                String msg = new String(buffer, 0, lenth);
+                byte[] buffer = new byte[1];
 
-                System.out.println("=========================data start");
-                System.out.println("data:\t" + msg);
-                System.out.println("=========================data end");
+                FileOutputStream fileOutputStream = new FileOutputStream(webServerRoot + "/tmp" + System.currentTimeMillis() + ".jpg");
+                int len2;
+                int i = 0;
+                boolean in = false;
+                StringBuffer stringBuffer = new StringBuffer();
+                String boundary = new String();
+                boolean startEntity = false;
+                boolean startBinary = false;
+                boolean startFile = false;
+                while ((len2 = inputStream.read(buffer)) != -1) {
 
-
-                ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
-                InputStreamReader requestInputStreamReader = new InputStreamReader(byteArrayInputStream);
-                BufferedReader bufferedReader = new BufferedReader(requestInputStreamReader);
-                String requestLine = bufferedReader.readLine();
-                System.out.println("=========================requestLine start");
-                System.out.println(requestLine + "\t" + Thread.currentThread());
-                System.out.println("=========================requestLine end");
-
-                // 获取实体体
-                String[] msgArr = msg.split("\n");
-                String entityBody = msgArr[msgArr.length - 1];
-
-//                获取文件路径
-                String[] requestLineArr = requestLine.split(" ");
-                String method = requestLineArr[0];
-                switch (method) {
-                    case "POST":
-                        doPost(entityBody);
+                    if(i > 80000){
                         break;
-                    case "GET":
-                    default:
-                        doGet(bufferedReader, requestLineArr[1]);
+                    }
+
+                    String lineStr = new String();
+                    String line = new String(buffer, 0, len2);
+//                    System.out.println(line);
+                    int asciiCode = Integer.parseInt(stringToAscii(line));
+                    if (in == false && ((65 <= asciiCode && asciiCode <= 90) || asciiCode == 45)) {
+                        in = true;
+                    }
+                    if (in == true && asciiCode == 13) {
+                        in = false;
+                        lineStr = stringBuffer.toString();
+//                        System.out.println("lineStr\t" + lineStr);
+                        stringBuffer = new StringBuffer();
+                    }
+                    if (asciiCode == 10) {
+                        startEntity = true;
+                    }
+
+                    if (in) {
+                        stringBuffer.append(line);
+                    }
+                    if (lineStr.startsWith("Content-Type")) {
+                        String[] lienArr = lineStr.split(";");
+                        if (lienArr[0].endsWith("multipart/form-data")) {
+                            boundary = lienArr[1].substring(lienArr[1].indexOf("=") + 1);
+                        }
+                    }
+
+                    if (startEntity && !boundary.isEmpty()) {
+
+                        if (!lineStr.isEmpty() && lineStr.startsWith("-") && lineStr.contains(boundary)) {
+                            System.out.println("startBinary start====================");
+                            System.out.println(lineStr);
+                            System.out.println(stringToAscii(lineStr));
+                            System.out.println(boundary);
+                            System.out.println("startBinary end====================");
+                            startBinary = true;
+                        }
+                    }
+
+                    if (startBinary) {
+//                        System.out.println("startFile start=================");
+//                        System.out.println(lineStr);
+//                        System.out.println(asciiCode);
+//                        System.out.println("startFile end=================");
+                        if (asciiCode == 10) {
+                            startFile = true;
+//                            System.out.println("startFile start=================");
+//                            System.out.println(line);
+//                            System.out.println("startFile end=================");
+                            continue;
+                        }
+                    }
+
+                    if (startFile) {
+                        fileOutputStream.write(buffer);
+//                        System.out.println("写入 tmp 结束");
+//                        if(i > 9000){
+//                            break;
+//                        }
+//                        System.out.println(lineStr);
+                    }
+
                 }
 
-                socket.close();
+                System.out.println("结束");
+//
+//                ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
+//                InputStreamReader requestInputStreamReader = new InputStreamReader(byteArrayInputStream);
+//                BufferedReader bufferedReader = new BufferedReader(requestInputStreamReader);
+//                String requestLine = bufferedReader.readLine();
+//                System.out.println("=========================requestLine start");
+//                System.out.println(requestLine + "\t" + Thread.currentThread());
+//                System.out.println("=========================requestLine end");
+//
+//                // 获取实体体
+//                String msg = new String("hello");
+//                String[] msgArr = msg.split("\n");
+//                String entityBody = msgArr[msgArr.length - 1];
+//
+////                获取文件路径
+//                String[] requestLineArr = requestLine.split(" ");
+//                String method = requestLineArr[0];
+//                switch (method) {
+//                    case "POST":
+//                        doPost(entityBody);
+//                        break;
+//                    case "GET":
+//                    default:
+//                        doGet(bufferedReader, requestLineArr[1]);
+//                }
+
+//                socket.close();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -105,7 +180,7 @@ public class Server {
             Map<String, String> entityBodyMap = parseEntityBody(decodedEntityBody);
             Set<String> names = entityBodyMap.keySet();
             String keyValueStr = "";
-            for(String name : names) keyValueStr += name + ":" + entityBodyMap.get(name) + "\n";
+            for (String name : names) keyValueStr += name + ":" + entityBodyMap.get(name) + "\n";
             byte[] keyValueStrBuff = keyValueStr.getBytes();
             int keyValueStrLength = keyValueStrBuff.length;
 
@@ -180,15 +255,28 @@ public class Server {
             return fileType;
         }
 
-        private Map<String, String> parseEntityBody(String entityBody){
+        private Map<String, String> parseEntityBody(String entityBody) {
             Map<String, String> entityBodyMap = new HashMap<>();
             String[] entityBodyArr = entityBody.split("&");
-            for(String keyAndValue : entityBodyArr){
+            for (String keyAndValue : entityBodyArr) {
                 String[] keyAndValueArr = keyAndValue.split("=");
                 entityBodyMap.put(keyAndValueArr[0], keyAndValueArr[1]);
             }
 
             return entityBodyMap;
+        }
+
+        public String stringToAscii(String value) {
+            StringBuffer sbu = new StringBuffer();
+            char[] chars = value.toCharArray();
+            for (int i = 0; i < chars.length; i++) {
+                if (i != chars.length - 1) {
+                    sbu.append((int) chars[i]).append(",");
+                } else {
+                    sbu.append((int) chars[i]);
+                }
+            }
+            return sbu.toString();
         }
     }
 }
