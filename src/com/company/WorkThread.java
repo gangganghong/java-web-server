@@ -78,8 +78,8 @@ public class WorkThread {
                 if (in == false && ((65 <= asciiCode && asciiCode <= 90) || asciiCode == 45)) {
                     in = true;
                 }
-//                字符是换行符，是一行字符串的结尾，获取一行字符串，初始化暂存一行字符串的StringBuffer
-                if (in == true && asciiCode == 10) {
+//                字符是换行符或回车符，是一行字符串的结尾，获取一行字符串，初始化暂存一行字符串的StringBuffer
+                if (in == true && asciiCode == 13) {
                     in = false;
                     lineStr = stringBuffer.toString();
                     stringBuffer = new StringBuffer();
@@ -99,9 +99,9 @@ public class WorkThread {
 //                进入二进制数据部分
 
                 if (!startBinary && !boundary.isEmpty()) {
+                    hasBoundary = true;
                     if (!lineStr.isEmpty() && lineStr.startsWith("-") && lineStr.contains(boundary)) {
                         startBinary = true;
-                        hasBoundary = true;
                     }
                 }
 
@@ -161,8 +161,8 @@ public class WorkThread {
             }
 
             inputStream.close();
-
             socket.close();
+
             System.out.println("结束");
             System.out.println(fileMetas);
 
@@ -205,7 +205,7 @@ public class WorkThread {
         OutputStream outputStream = socket.getOutputStream();
         outputStream.write(stringBuffer.toString().getBytes());
         outputStream.flush();
-        outputStream.close();
+//        outputStream.close();
 
         System.out.println(stringBuffer.toString());
     }
@@ -248,7 +248,7 @@ public class WorkThread {
                     "<head><title>404 Not Found</title></head>\n" +
                     "<body>\n" +
                     "<center><h1>404 Not Found</h1></center>\n" +
-                    "<hr><center>nginx/1.15.6</center>\n" +
+                    "<hr><center>cg-java-web-server/1.0</center>\n" +
                     "</body>\n" +
                     "</html>\n" +
                     "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
@@ -263,9 +263,8 @@ public class WorkThread {
 
             stringBuffer.append(notFoundHtml);
 
-
             outputStream.write(stringBuffer.toString().getBytes());
-            outputStream.close();
+//            outputStream.close();
         }
     }
 
