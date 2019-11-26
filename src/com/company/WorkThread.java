@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.StringTokenizer;
 
 public class WorkThread {
     private final String webServerRoot = "/Users/cg/data/code/wheel/java/demo/html";
@@ -37,18 +38,46 @@ public class WorkThread {
             int preAsciiCode = 0;
             int prePreAsciiCode = 0;
             boolean startFile = false;
+            boolean startHead = false;
+            boolean endHead = false;
+            boolean hasBoundary = false;
             HashMap<String, HashMap> fileMetas = new HashMap<>();
             HashMap<String, String> fileMeta = new HashMap<>();
+
+            StringBuffer headerBuffer = new StringBuffer();
+
+            HashMap<String, HashMap> header = null;
 
             while ((bufferLen = inputStream.read(buffer)) != -1) {
 
                 fileOutputStream1.write(buffer);
 
                 String lineStr = new String();
-
-//                字符是A-Z之间（包含头尾）或-，是一行字符串的开头，开始暂存字符串
                 String line = new String(buffer, 0, bufferLen);
                 int asciiCode = Integer.parseInt(stringToAscii(line));
+
+                if (!startHead && (65 <= asciiCode && asciiCode <= 90)) {
+                    startHead = true;
+                }
+
+                if (!endHead && (prePreAsciiCode == 13 && preAsciiCode == 10 && asciiCode == 13)) {
+                    endHead = true;
+                }
+
+                if (startHead && !endHead) {
+                    headerBuffer.append(line);
+//                    错误写法
+//                    headerBuffer.append(buffer);
+                }
+
+                if (endHead) {
+                    header = getRequestHeaders(headerBuffer.toString());
+                }
+
+//                String method = null;
+
+
+//                字符是A-Z之间（包含头尾）或-，是一行字符串的开头，开始暂存字符串
                 if (in == false && ((65 <= asciiCode && asciiCode <= 90) || asciiCode == 45)) {
                     in = true;
                 }
@@ -71,9 +100,11 @@ public class WorkThread {
                     }
                 }
 //                进入二进制数据部分
+
                 if (!startBinary && !boundary.isEmpty()) {
                     if (!lineStr.isEmpty() && lineStr.startsWith("-") && lineStr.contains(boundary)) {
                         startBinary = true;
+                        hasBoundary = true;
                     }
                 }
 
@@ -123,11 +154,32 @@ public class WorkThread {
 //                字符串为 【- + 回车 + 换行】 时，即最后一个 boundary，文件数据全部接收完毕。
 //                一定要在此时 给出响应信息 + 关闭对应的读写字节流，否则，浏览器会一直处于 pending 状态。
 //                耗时很久，才灵光乍现，猜想浏览器一直 pending 的原因是在接收完全部数据后，未立刻进行上述操作。
-                if(asciiCode == 10 && preAsciiCode == 13 && prePreAsciiCode == 45){
+                if (isEnd(asciiCode, preAsciiCode, prePreAsciiCode, hasBoundary)) {
                     OutputStream outputStream = socket.getOutputStream();
-                    doPost(outputStream);
-                    outputStream.flush();
-                    outputStream.close();
+//                    doPost(outputStream);
+//                    outputStream.flush();
+//                    outputStream.close();
+//                    break;
+
+                    String method = null;
+                    String uri = null;
+                    if (header != null && !header.isEmpty()) {
+                        HashMap<String, String> requestLine = header.get("requestLine");
+                        method = requestLine.get("Method");
+                        uri = requestLine.get("Uri");
+                    }
+
+                    if (method != null) {
+                        switch (method) {
+                            case "POST":
+                                doPost(outputStream);
+                                break;
+                            case "GET":
+                            default:
+                                doGet(uri);
+                        }
+                    }
+
                     break;
                 }
 
@@ -157,7 +209,7 @@ public class WorkThread {
         String html = "<html><head><title>cg</title></head><body><p>I am cg!</p></body></html>" + (char) 10 + (char) 13;
         stringBuffer.append("Content-Length: " + html.getBytes().length + "\n");
         stringBuffer.append("Content-Type: text/html; charset=UTF-8" + (char) 10 + (char) 13);
-        stringBuffer.append("Connection: closed" + (char)10 + (char)13);
+        stringBuffer.append("Connection: closed" + (char) 10 + (char) 13);
         stringBuffer.append("" + (char) 10 + (char) 13);
         stringBuffer.append(html);
 
@@ -167,8 +219,9 @@ public class WorkThread {
         System.out.println("post end");
     }
 
-    private void doGet(BufferedReader bufferedReader, String filename) throws IOException {
+    private void doGet(String filename) throws IOException {
         System.out.println("GET 请求");
+
 
         String fileType = getFileType(filename);
         OutputStream outputStream = socket.getOutputStream();
@@ -176,7 +229,7 @@ public class WorkThread {
 
         // 读取磁盘文件
         File file = new File(webServerRoot + filename);
-        if (file.exists()) {
+        if (filename != null && file.exists()) {
             stringBuffer.append("HTTP/1.1 200 OK\n");
 
             stringBuffer.append("Content-Type: " + fileType + "; charset=UTF-8\n");
@@ -197,15 +250,31 @@ public class WorkThread {
                 dataOutputStream.write(buf, 0, len);
             }
             fileInputStream.close();
-            bufferedReader.close();
             dataOutputStream.close();
 
         } else {
-            stringBuffer.append("HTTP/1.1 404 Not Found\n");
-            stringBuffer.append("\n");
-            outputStream.write(stringBuffer.toString().getBytes());
+            String notFoundHtml = "<html>\n" +
+                    "<head><title>404 Not Found</title></head>\n" +
+                    "<body>\n" +
+                    "<center><h1>404 Not Found</h1></center>\n" +
+                    "<hr><center>nginx/1.15.6</center>\n" +
+                    "</body>\n" +
+                    "</html>\n" +
+                    "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                    "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                    "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                    "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                    "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                    "<!-- a padding to disable MSIE and Chrome friendly error page -->";
+            stringBuffer.append("HTTP/1.1 404 Not Found\r\n");
+            stringBuffer.append("Content-Length:" + notFoundHtml.getBytes().length + "\r\n");
+            stringBuffer.append("\r\n");
 
-            bufferedReader.close();
+            stringBuffer.append(notFoundHtml);
+
+
+            outputStream.write(stringBuffer.toString().getBytes());
+            outputStream.close();
         }
     }
 
@@ -256,5 +325,61 @@ public class WorkThread {
         }
 
         return fileMeta;
+    }
+
+    public HashMap<String, String> parseHeadLines(String requestHeaderStr) {
+        HashMap<String, String> parsedHeadLines = new HashMap<>();
+
+        String delim = "" + (char) 13 + (char) 10;
+        StringTokenizer stringTokenizer = new StringTokenizer(requestHeaderStr, delim);
+        int i = 0;
+        while (stringTokenizer.hasMoreElements()) {
+            if (i == 0) {
+                i++;
+                stringTokenizer.nextElement();
+                continue;
+            }
+            String headLine = stringTokenizer.nextElement().toString();
+            String key = headLine.substring(0, headLine.indexOf(":")).replaceAll(" ", "");
+            String value = headLine.substring(headLine.indexOf(":") + 1).replaceAll(" ", "");
+            parsedHeadLines.put(key, value);
+        }
+
+        return parsedHeadLines;
+    }
+
+    public HashMap<String, String> parseRequestLine(String requestHeaderStr) {
+        HashMap<String, String> parsedRequestLine = new HashMap<>();
+        String delim = "" + (char) 10;
+        String requestLineStr = requestHeaderStr.substring(0, requestHeaderStr.indexOf(delim));
+        String[] requestLineArr = requestLineStr.split(" ");
+        parsedRequestLine.put("Method", requestLineArr[0]);
+        parsedRequestLine.put("Uri", requestLineArr[1]);
+        parsedRequestLine.put("Http", requestLineArr[2]);
+
+        return parsedRequestLine;
+    }
+
+    public HashMap<String, HashMap> getRequestHeaders(String requestHeaderStr) {
+        HashMap requestLine = parseRequestLine(requestHeaderStr);
+        HashMap headLines = parseHeadLines(requestHeaderStr);
+        HashMap<String, HashMap> requestHeaders = new HashMap<>();
+        requestHeaders.put("requestLine", requestLine);
+        requestHeaders.put("headerLine", headLines);
+
+        return requestHeaders;
+    }
+
+    private boolean isEnd(int asciiCode, int preAsciiCode, int prePreAsciiCode, boolean hasBoundary) {
+
+        if (asciiCode * preAsciiCode * prePreAsciiCode == 0) {
+            return false;
+        }
+
+        if (hasBoundary) {
+            return (asciiCode == 10 && preAsciiCode == 13 && prePreAsciiCode == 45);
+        } else {
+            return (asciiCode == 10 && preAsciiCode == 13 && prePreAsciiCode == 10);
+        }
     }
 }
