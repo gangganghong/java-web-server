@@ -2,10 +2,8 @@ package com.company;
 
 import java.io.*;
 import java.net.Socket;
-import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
 public class WorkThread {
     private final String webServerRoot = "/Users/cg/data/code/wheel/java/demo/html";
@@ -28,7 +26,7 @@ public class WorkThread {
             byte[] buffer = new byte[1];
 
             FileOutputStream fileOutputStream = null;
-//            FileOutputStream fileOutputStream1 = new FileOutputStream(webServerRoot + "/log" + System.currentTimeMillis());
+            FileOutputStream fileOutputStream1 = new FileOutputStream(webServerRoot + "/log" + System.currentTimeMillis());
 
             int len2;
             int i = 0;
@@ -48,13 +46,12 @@ public class WorkThread {
 
             while ((len2 = inputStream.read(buffer)) != -1) {
 
-//                fileOutputStream1.write(buffer);
+                fileOutputStream1.write(buffer);
 
                 String lineStr = new String();
                 String preLineStr = new String();
                 String line = new String(buffer, 0, len2);
                 int asciiCode = Integer.parseInt(stringToAscii(line));
-
 
                 if (in == false && ((65 <= asciiCode && asciiCode <= 90) || asciiCode == 45)) {
                     in = true;
@@ -91,20 +88,10 @@ public class WorkThread {
 //                        Content-Type: image/jpeg
 
                     if (lineStr.contains("Content-Disposition")) {
-//                        System.out.println("Content-Disposition start====================");
-//                        System.out.println(lineStr);
-//                        System.out.println(preAsciiCode);
-//                        System.out.println(asciiCode);
-//                        System.out.println("Content-Disposition end====================");
                         fileMeta = parseFileMeta(lineStr, fileMeta);
                     }
 
                     if (lineStr.contains("Content-Type")) {
-//                        System.out.println("Content-Type start====================");
-//                        System.out.println(lineStr);
-//                        System.out.println(preAsciiCode);
-//                        System.out.println(asciiCode);
-//                        System.out.println("Content-Type end====================");
                         fileMeta = parseFileMeta(lineStr, fileMeta);
                     }
 
@@ -130,8 +117,6 @@ public class WorkThread {
                     if (prePreAsciiCode == 13 && preAsciiCode == 10 && asciiCode == 45) {
                         firstCrlf = false;
                         fileOutputStream.close();
-
-
                     }
                 }
 
@@ -160,14 +145,13 @@ public class WorkThread {
 //            关闭后，浏览器异常，不能收到返回
 
             fileOutputStream.close();
-//            fileOutputStream1.close();
+            fileOutputStream1.close();
             inputStream.close();
 
             socket.close();
-
             System.out.println("结束");
+            System.out.println(fileMetas);
 
-//            System.out.println(fileMetas);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -197,22 +181,12 @@ public class WorkThread {
 
         String keyValueStr = new String("hello");
         String html = "<html><head><title>cg</title></head><body><p>I am cg!</p></body></html>" + (char) 10 + (char) 13;
-        int keyValueStrLength = keyValueStr.getBytes().length;
         stringBuffer.append("Content-Length: " + html.getBytes().length + "\n");
-//        stringBuffer.append("Transfer-Encoding: chunked"  + (char)10 + (char)13);
         stringBuffer.append("Content-Type: text/html; charset=UTF-8" + (char) 10 + (char) 13);
         stringBuffer.append("Connection: closed" + (char)10 + (char)13);
         stringBuffer.append("" + (char) 10 + (char) 13);
-//        stringBuffer.append(keyValueStr);
-//
-//
-//        String st2 = new String("管理员");
-//        System.out.println(st2.length());
-//        System.out.println(valueLength);
-//        stringBuffer.append("------WebKitFormBoundaryIqmAOK1WzKVEtB5o" + (char)10 + (char)13);
 
         stringBuffer.append(html);
-//        stringBuffer.append("------WebKitFormBoundaryIqmAOK1WzKVEtB5o--");
 
         outputStream.write(stringBuffer.toString().getBytes());
 
