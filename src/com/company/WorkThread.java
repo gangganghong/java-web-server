@@ -20,16 +20,13 @@ public class WorkThread {
 //        }
 
     public void run() {
-        System.out.println("工作线程\t" + Thread.currentThread() + "\t" + socket + "\t处理请求\t" + System.currentTimeMillis());
         try {
-
             InputStream inputStream = socket.getInputStream();
             byte[] buffer = new byte[1];
             int bufferLen;
 
             FileOutputStream fileOutputStream = null;
             FileOutputStream fileOutputStream1 = new FileOutputStream(webServerRoot + "/log" + System.currentTimeMillis());
-
 
             boolean in = false;
             StringBuffer stringBuffer = new StringBuffer();
@@ -155,31 +152,7 @@ public class WorkThread {
 //                一定要在此时 给出响应信息 + 关闭对应的读写字节流，否则，浏览器会一直处于 pending 状态。
 //                耗时很久，才灵光乍现，猜想浏览器一直 pending 的原因是在接收完全部数据后，未立刻进行上述操作。
                 if (isEnd(asciiCode, preAsciiCode, prePreAsciiCode, hasBoundary)) {
-                    OutputStream outputStream = socket.getOutputStream();
-//                    doPost(outputStream);
-//                    outputStream.flush();
-//                    outputStream.close();
-//                    break;
-
-                    String method = null;
-                    String uri = null;
-                    if (header != null && !header.isEmpty()) {
-                        HashMap<String, String> requestLine = header.get("requestLine");
-                        method = requestLine.get("Method");
-                        uri = requestLine.get("Uri");
-                    }
-
-                    if (method != null) {
-                        switch (method) {
-                            case "POST":
-                                doPost(outputStream);
-                                break;
-                            case "GET":
-                            default:
-                                doGet(uri);
-                        }
-                    }
-
+                    doRequest(header);
                     break;
                 }
 
@@ -187,9 +160,6 @@ public class WorkThread {
                 preAsciiCode = asciiCode;
             }
 
-            System.out.println(fileMetas);
-
-//            fileOutputStream1.close();
             inputStream.close();
 
             socket.close();
@@ -201,9 +171,28 @@ public class WorkThread {
         }
     }
 
-    private void doPost(OutputStream outputStream) throws IOException {
-        System.out.println("POST 请求");
+    private void doRequest(HashMap<String, HashMap> header) throws IOException {
+        if (header == null || header.isEmpty()) return;
 
+        String method;
+        String uri;
+        HashMap<String, String> requestLine = header.get("requestLine");
+        method = requestLine.get("Method");
+        uri = requestLine.get("Uri");
+
+        if (method == null) return;
+
+        switch (method) {
+            case "POST":
+                doPost();
+                break;
+            case "GET":
+            default:
+                doGet(uri);
+        }
+    }
+
+    private void doPost() throws IOException {
         StringBuffer stringBuffer = new StringBuffer();
         stringBuffer.append("HTTP/1.1 200 OK\n");
         String html = "<html><head><title>cg</title></head><body><p>I am cg!</p></body></html>" + (char) 10 + (char) 13;
@@ -213,10 +202,12 @@ public class WorkThread {
         stringBuffer.append("" + (char) 10 + (char) 13);
         stringBuffer.append(html);
 
+        OutputStream outputStream = socket.getOutputStream();
         outputStream.write(stringBuffer.toString().getBytes());
+        outputStream.flush();
+        outputStream.close();
 
         System.out.println(stringBuffer.toString());
-        System.out.println("post end");
     }
 
     private void doGet(String filename) throws IOException {
@@ -288,17 +279,6 @@ public class WorkThread {
         }
 
         return fileType;
-    }
-
-    private Map<String, String> parseEntityBody(String entityBody) {
-        Map<String, String> entityBodyMap = new HashMap<>();
-        String[] entityBodyArr = entityBody.split("&");
-        for (String keyAndValue : entityBodyArr) {
-            String[] keyAndValueArr = keyAndValue.split("=");
-            entityBodyMap.put(keyAndValueArr[0], keyAndValueArr[1]);
-        }
-
-        return entityBodyMap;
     }
 
     public String stringToAscii(String value) {
