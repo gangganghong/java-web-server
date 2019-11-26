@@ -24,58 +24,54 @@ public class WorkThread {
 
             InputStream inputStream = socket.getInputStream();
             byte[] buffer = new byte[1];
+            int bufferLen;
 
             FileOutputStream fileOutputStream = null;
             FileOutputStream fileOutputStream1 = new FileOutputStream(webServerRoot + "/log" + System.currentTimeMillis());
 
-            int len2;
-            int i = 0;
+
             boolean in = false;
             StringBuffer stringBuffer = new StringBuffer();
             String boundary = new String();
-            boolean startEntity = false;
             boolean startBinary = false;
-            boolean startFile = false;
             int preAsciiCode = 0;
             int prePreAsciiCode = 0;
-            boolean firstCrlf = false;
-            StringBuffer tmpBuffer = new StringBuffer();
+            boolean startFile = false;
             HashMap<String, HashMap> fileMetas = new HashMap<>();
             HashMap<String, String> fileMeta = new HashMap<>();
 
-
-            while ((len2 = inputStream.read(buffer)) != -1) {
+            while ((bufferLen = inputStream.read(buffer)) != -1) {
 
                 fileOutputStream1.write(buffer);
 
                 String lineStr = new String();
-                String preLineStr = new String();
-                String line = new String(buffer, 0, len2);
-                int asciiCode = Integer.parseInt(stringToAscii(line));
 
+//                字符是A-Z之间（包含头尾）或-，是一行字符串的开头，开始暂存字符串
+                String line = new String(buffer, 0, bufferLen);
+                int asciiCode = Integer.parseInt(stringToAscii(line));
                 if (in == false && ((65 <= asciiCode && asciiCode <= 90) || asciiCode == 45)) {
                     in = true;
                 }
+//                字符是换行符，是一行字符串的结尾，获取一行字符串，初始化暂存一行字符串的StringBuffer
                 if (in == true && asciiCode == 10) {
                     in = false;
                     lineStr = stringBuffer.toString();
                     stringBuffer = new StringBuffer();
                 }
-
+//                暂存字符串
                 if (in) {
                     stringBuffer.append(line);
                 }
 
-
+//                获取multipart表单的boundary
                 if (lineStr.startsWith("Content-Type")) {
                     String[] lienArr = lineStr.split(";");
                     if (lienArr[0].endsWith("multipart/form-data")) {
                         boundary = lienArr[1].substring(lienArr[1].indexOf("=") + 1);
                     }
                 }
-
+//                进入二进制数据部分
                 if (!startBinary && !boundary.isEmpty()) {
-
                     if (!lineStr.isEmpty() && lineStr.startsWith("-") && lineStr.contains(boundary)) {
                         startBinary = true;
                     }
@@ -86,7 +82,6 @@ public class WorkThread {
 //                        获取下面的信息
 //                        Content-Disposition: form-data; name="picture"; filename="tooopen_sy_10140314310699.jpg"
 //                        Content-Type: image/jpeg
-
                     if (lineStr.contains("Content-Disposition")) {
                         fileMeta = parseFileMeta(lineStr, fileMeta);
                     }
@@ -102,9 +97,10 @@ public class WorkThread {
                         }
                     }
 
-                    if ((firstCrlf == false) && (asciiCode == 10 && preAsciiCode == 13 && prePreAsciiCode == 10)) {
+//                    字符串为 【换行 + 回车 + 换行】 时，接下来的数据是 文件数据
+                    if ((startFile == false) && (asciiCode == 10 && preAsciiCode == 13 && prePreAsciiCode == 10)) {
 
-                        firstCrlf = true;
+                        startFile = true;
 
                         prePreAsciiCode = preAsciiCode;
                         preAsciiCode = asciiCode;
@@ -113,17 +109,20 @@ public class WorkThread {
 
                         continue;
                     }
-
+//                    字符串为 【回车 + 换行 + boundary】 时，即再次遇到了 boundary，一个文件的数据全部接收完毕
                     if (prePreAsciiCode == 13 && preAsciiCode == 10 && asciiCode == 45) {
-                        firstCrlf = false;
+                        startFile = false;
                         fileOutputStream.close();
                     }
                 }
-
-                if (firstCrlf) {
+//                接收的是文件数据，将文件存储
+                if (startFile) {
                     fileOutputStream.write(buffer);
                 }
 
+//                字符串为 【- + 回车 + 换行】 时，即最后一个 boundary，文件数据全部接收完毕。
+//                一定要在此时 给出响应信息 + 关闭对应的读写字节流，否则，浏览器会一直处于 pending 状态。
+//                耗时很久，才灵光乍现，猜想浏览器一直 pending 的原因是在接收完全部数据后，未立刻进行上述操作。
                 if(asciiCode == 10 && preAsciiCode == 13 && prePreAsciiCode == 45){
                     OutputStream outputStream = socket.getOutputStream();
                     doPost(outputStream);
@@ -136,16 +135,9 @@ public class WorkThread {
                 preAsciiCode = asciiCode;
             }
 
-
             System.out.println(fileMetas);
 
-
-
-
-//            关闭后，浏览器异常，不能收到返回
-
-            fileOutputStream.close();
-            fileOutputStream1.close();
+//            fileOutputStream1.close();
             inputStream.close();
 
             socket.close();
@@ -159,39 +151,19 @@ public class WorkThread {
 
     private void doPost(OutputStream outputStream) throws IOException {
         System.out.println("POST 请求");
-//        String decodedEntityBody = URLDecoder.decode(entityBody, "UTF-8");
-//        System.out.println("decodedEntityBody start");
-//        System.out.println(decodedEntityBody);
-//        System.out.println("decodedEntityBody end");
-//        String[] decodedEntityBodyArr = decodedEntityBody.split("=");
-//        System.out.println(decodedEntityBodyArr[0] + "\t" + decodedEntityBodyArr[1]);
+
         StringBuffer stringBuffer = new StringBuffer();
         stringBuffer.append("HTTP/1.1 200 OK\n");
-//        stringBuffer.append("Content-Type: text/html" + "; charset=UTF-8\n");
-
-//        byte[] decodedEntityBodyBuff = decodedEntityBody.getBytes();
-//        int valueLength = decodedEntityBodyBuff.length;
-//
-//        Map<String, String> entityBodyMap = parseEntityBody(decodedEntityBody);
-//        Set<String> names = entityBodyMap.keySet();
-//        String keyValueStr = "";
-//        for (String name : names) keyValueStr += name + ":" + entityBodyMap.get(name) + "\n";
-//        byte[] keyValueStrBuff = keyValueStr.getBytes();
-//        int keyValueStrLength = keyValueStrBuff.length;
-
-        String keyValueStr = new String("hello");
         String html = "<html><head><title>cg</title></head><body><p>I am cg!</p></body></html>" + (char) 10 + (char) 13;
         stringBuffer.append("Content-Length: " + html.getBytes().length + "\n");
         stringBuffer.append("Content-Type: text/html; charset=UTF-8" + (char) 10 + (char) 13);
         stringBuffer.append("Connection: closed" + (char)10 + (char)13);
         stringBuffer.append("" + (char) 10 + (char) 13);
-
         stringBuffer.append(html);
 
         outputStream.write(stringBuffer.toString().getBytes());
 
         System.out.println(stringBuffer.toString());
-
         System.out.println("post end");
     }
 
