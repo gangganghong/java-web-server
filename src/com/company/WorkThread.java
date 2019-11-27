@@ -163,7 +163,8 @@ public class WorkThread {
                     allDataTmp.flip();
                     byte[] allData = new byte[allDataTmp.remaining()];
                     allDataTmp.get(allData);
-                    doRequest(header, allData);
+                    proxy(allData, socket);
+//                    doRequest(header, allData);
                     break;
                 }
 
@@ -409,5 +410,19 @@ public class WorkThread {
     public boolean isDynamicRequest(String uri) {
         String lowCaseUri = uri.toLowerCase();
         return lowCaseUri.contains(".php");
+    }
+
+    // 反向代理功能
+    private void proxy(byte[] requestData, Socket originalSocket) throws IOException{
+        Socket socket = new Socket("127.0.0.1", 80);
+        OutputStream outputStream = socket.getOutputStream();
+        outputStream.write(requestData);
+
+        InputStream inputStream = socket.getInputStream();
+        byte[] buff = new byte[1024];
+        OutputStream outputStream1 = originalSocket.getOutputStream();
+        while(inputStream.read(buff) != -1){
+            outputStream1.write(buff);
+        }
     }
 }
