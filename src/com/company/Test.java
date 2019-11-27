@@ -9,8 +9,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class Test {
+    private String webServerRoot = "/Users/cg/data/www/cg/tool";
 
-    public HashMap<String, String> run() throws Exception {
+    public HashMap<String, String> run(HashMap<String, HashMap> header, byte[] dataFromWebServer) throws Exception {
         Socket client = new Socket("127.0.0.1", 9000);
 
         InputStream in = client.getInputStream();
@@ -26,14 +27,53 @@ public class Test {
         byte[] begin_request = fcgi.fcgiPacket(fcgi_request_type.FCGI_BEGIN_REQUEST, request_id, begin_request_body);
         System.out.println("FCGI_BEGIN_REQUEST:\n" + Base64.getEncoder().encodeToString(begin_request));
         //2.params
+        String entity2 = "POST /post.html HTTP/1.1\n" +
+                "Host: localhost:2000\n" +
+                "Connection: keep-alive\n" +
+                "Content-Length: 254195\n" +
+                "Pragma: no-cache\n" +
+                "Cache-Control: no-cache\n" +
+                "Origin: http://dev.cg.com\n" +
+                "Upgrade-Insecure-Requests: 1\n" +
+                "Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryIqmAOK1WzKVEtB5o\n" +
+                "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36\n" +
+                "Sec-Fetch-User: ?1\n" +
+                "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3\n" +
+                "Sec-Fetch-Site: cross-site\n" +
+                "Sec-Fetch-Mode: navigate\n" +
+                "Referer: http://dev.cg.com/tool/form.html\n" +
+                "Accept-Encoding: gzip, deflate, br\n" +
+                "Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7\n" +
+                "\n" +
+                "------WebKitFormBoundaryIqmAOK1WzKVEtB5o\n" +
+                "Content-Disposition: form-data; name=\"name\"\n" +
+                "\n" +
+                "ç®¡ç\u0090†å‘˜\n" +
+                "------WebKitFormBoundaryIqmAOK1WzKVEtB5o\n" +
+                "Content-Disposition: form-data; name=\"desc\"\n" +
+                "\n" +
+                "å\u0090¾é—®æ— ä¸ºè°“\n" +
+                "------WebKitFormBoundaryIqmAOK1WzKVEtB5o\n" +
+                "Content-Disposition: form-data; name=\"picture\"; filename=\"2015110214261032002.jpg\"\n" +
+                "Content-Type: image/jpeg";
+//        String postData = new String("\r\n------we\r\n" +
+//                "Content-Disposition: form-data; name=\"nameer\"\r\n------234");
+//        String postData = new String("Content-Disposition: form-data;name=\"name\"\r\n------2345WebKitFormBoundaryIqmAOK1WzKVEtB5o--");
+        byte[] postDatByte = dataFromWebServer;
+        HashMap<String, String> requestHeaders = header.get("requestLine");
+        HashMap<String, String> headLine = header.get("headerLine");
+        String uri = requestHeaders.get("Uri");
+        String contentType = headLine.get("Content-Type");
+        String contentLength = headLine.get("Content-Length");
+
         Map<String, String> params = new LinkedHashMap<>();
         params.put("GATEWAY_INTERFACE", "FastCGI/1.0");
-        params.put("REQUEST_METHOD", "GET");
-        params.put("SCRIPT_FILENAME", "/Users/cg/data/www/cg/tool/tmp.php");
-        params.put("SCRIPT_NAME", "/tmp.php");
+        params.put("REQUEST_METHOD", requestHeaders.get("Method"));
+        params.put("SCRIPT_FILENAME", webServerRoot + uri);
+        params.put("SCRIPT_NAME", uri);
         params.put("QUERY_STRING", "");
-        params.put("REQUEST_URI", "/tmp.php");
-        params.put("DOCUMENT_URI", "/tmp.php");
+        params.put("REQUEST_URI", uri);
+        params.put("DOCUMENT_URI", uri);
         params.put("SERVER_SOFTWARE", "php/fcgiclient");
         params.put("REMOTE_ADDR", "127.0.0.1");
         params.put("REMOTE_PORT", "9985");
@@ -41,8 +81,11 @@ public class Test {
         params.put("SERVER_PORT", "80");
         params.put("SERVER_NAME", "DESKTOP-NCL22GF");
         params.put("SERVER_PROTOCOL", "HTTP/1.1");
-        params.put("CONTENT_TYPE", "");
-        params.put("CONTENT_LENGTH", "10");
+        params.put("CONTENT_TYPE", contentType == null ? "" : contentType);
+//        params.put("CONTENT_TYPE", "application/x-www-form-urlencoded");
+
+        params.put("CONTENT_LENGTH", "" + (contentLength == null ? 0 : contentLength));
+        params.put("AUTHOR", "cg");
 
         System.out.println("\nparam pair base64:");
         ByteBuffer paramContainer = ByteBuffer.allocate(1024);
@@ -61,7 +104,7 @@ public class Test {
         byte[] fcgi_params_end = fcgi.fcgiPacket(fcgi_request_type.FCGI_PARAMS, request_id, new byte[0]);
         System.out.println("\nFCGI_PARAMS end with empty content:\n" + Base64.getEncoder().encodeToString(fcgi_params_end));
         //3.stdin
-        byte[] fcgi_stdin = fcgi.fcgiPacket(fcgi_request_type.FCGI_STDIN, request_id, new byte[0]);
+        byte[] fcgi_stdin = fcgi.fcgiPacket(fcgi_request_type.FCGI_STDIN, request_id, postDatByte);
         System.out.println("\nFCGI_STDIN:\n" + Base64.getEncoder().encodeToString(fcgi_stdin));
 
         byte[] end_request_body = new byte[8];
@@ -114,10 +157,29 @@ public class Test {
         System.out.println(resultFromPHP);
         System.out.println("from php end\t结束");
         int headerEndIndex = resultFromPHP.indexOf("\r\n\r\n");
-        String header = resultFromPHP.substring(0, headerEndIndex);
+        String headerStr = resultFromPHP.substring(0, headerEndIndex);
+        String[] headerArr = headerStr.split("\r\n");
+
+        String httpStatus = null;
+        String powered;
+        String phpDataContentType;
+
+        if(headerArr.length > 2){
+//            Primary script unknown\nStatus: 404 Not Found
+            httpStatus = headerArr[0].split(":")[1];
+            powered = headerArr[1];
+            phpDataContentType = headerArr[2].split(":")[1];
+//            phpDataContentType = headerArr[3].split(":")[1];
+        }else{
+            powered = headerArr[0];
+            phpDataContentType = headerArr[1].split(":")[1];
+        }
+
         String content = resultFromPHP.substring(headerEndIndex + 1);
         HashMap<String, String> result = new HashMap<>();
-        result.put("header", header);
+        result.put("httpStatus", httpStatus);
+        result.put("powered", powered);
+        result.put("ContentType", phpDataContentType);
         result.put("content", content);
 
         return result;

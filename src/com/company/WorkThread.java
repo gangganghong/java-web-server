@@ -2,11 +2,9 @@ package com.company;
 
 
 import java.io.*;
-import java.net.InetAddress;
 import java.net.Socket;
-import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.StringTokenizer;
 
 public class WorkThread {
@@ -24,7 +22,6 @@ public class WorkThread {
 
     public void run() {
         try {
-
             System.out.println("socket info start");
             System.out.println(socket.getPort());
             System.out.println("socket info end");
@@ -53,7 +50,10 @@ public class WorkThread {
 
             HashMap<String, HashMap> header = null;
 
+            ByteBuffer allDataTmp = ByteBuffer.allocate(1024 * 1024);
+
             while ((bufferLen = inputStream.read(buffer)) != -1) {
+                allDataTmp.put(buffer);
 
                 fileOutputStream1.write(buffer);
 
@@ -160,7 +160,10 @@ public class WorkThread {
 //                一定要在此时 给出响应信息 + 关闭对应的读写字节流，否则，浏览器会一直处于 pending 状态。
 //                耗时很久，才灵光乍现，猜想浏览器一直 pending 的原因是在接收完全部数据后，未立刻进行上述操作。
                 if (isEnd(asciiCode, preAsciiCode, prePreAsciiCode, hasBoundary)) {
-                    doRequest(header);
+                    allDataTmp.flip();
+                    byte[] allData = new byte[allDataTmp.remaining()];
+                    allDataTmp.get(allData);
+                    doRequest(header, allData);
                     break;
                 }
 
@@ -179,7 +182,7 @@ public class WorkThread {
         }
     }
 
-    private void doRequest(HashMap<String, HashMap> header) throws IOException {
+    private void doRequest(HashMap<String, HashMap> header, byte[] data) throws IOException {
         if (header == null || header.isEmpty()) return;
 
         String method;
@@ -189,129 +192,126 @@ public class WorkThread {
         uri = requestLine.get("Uri");
         if (method == null) return;
 
+        HashMap<String, String> dataFromPHP = null;
         if (isDynamicRequest(uri)) {
             Test test = new Test();
-            HashMap<String, String> dataFromPHP = null;
-            String html;
             try {
-                dataFromPHP = test.run();
+                dataFromPHP = test.run(header, data);
             } catch (Exception e) {
                 e.printStackTrace();
             }
 
             StringBuffer stringBuffer = new StringBuffer();
             stringBuffer.append("HTTP/1.1 200 OK\n");
-            html = dataFromPHP.get("content");
-            stringBuffer.append("Content-Length: " + html.getBytes().length + "\n");
-            stringBuffer.append("Content-Type: text/html; charset=UTF-8" + (char) 10 + (char) 13);
-            stringBuffer.append("Connection: closed" + (char) 10 + (char) 13);
-            stringBuffer.append("" + (char) 10 + (char) 13);
-            stringBuffer.append(html);
+        }
 
-            OutputStream outputStream = socket.getOutputStream();
-            outputStream.write(stringBuffer.toString().getBytes());
-            outputStream.flush();
-
-            System.out.println(stringBuffer.toString());
-        } else {
-            switch (method) {
-                case "POST":
-                    doPost();
-                    break;
-                case "GET":
-                default:
-                    doGet(uri);
-            }
+        switch (method) {
+            case "POST":
+                doPost(dataFromPHP);
+                break;
+            case "GET":
+            default:
+                doGet(uri, dataFromPHP);
         }
     }
 
-    private void doPost() throws IOException {
-
-        Test test = new Test();
-        HashMap<String, String> dataFromPHP = null;
-        String html;
-        try {
-            dataFromPHP = test.run();
-        } catch (Exception e) {
-            e.printStackTrace();
+    private void doPost(HashMap<String, String> dataFromPHP) throws IOException {
+        String httpStatus = null;
+        String html = null;
+        String contenType = "";
+        if (dataFromPHP != null) {
+            html = dataFromPHP.get("content");
+            contenType = dataFromPHP.get("Content-Type");
+            httpStatus = dataFromPHP.get("httpStatus");
         }
 
+        if (httpStatus == null) {
+            httpStatus = "HTTP/1.1 200 OK";
+        }
+        String lineFlag = "" + (char) 10 + (char) 13;
         StringBuffer stringBuffer = new StringBuffer();
-        stringBuffer.append("HTTP/1.1 200 OK\n");
-        if (dataFromPHP == null) {
-            html = "<html><head><title>cg</title></head><body><p>I am cg!</p></body></html>" + (char) 10 + (char) 13;
-        } else {
-            html = dataFromPHP.toString();
-        }
-        stringBuffer.append("Content-Length: " + html.getBytes().length + "\n");
-        stringBuffer.append("Content-Type: text/html; charset=UTF-8" + (char) 10 + (char) 13);
-        stringBuffer.append("Connection: closed" + (char) 10 + (char) 13);
-        stringBuffer.append("" + (char) 10 + (char) 13);
-        stringBuffer.append(html);
+        stringBuffer.append(httpStatus + lineFlag);
+        stringBuffer.append("Content-Length: " + html.getBytes().length + lineFlag);
+        stringBuffer.append("Content-Type: " + contenType + lineFlag);
+        stringBuffer.append("Connection: closed" + lineFlag);
+        stringBuffer.append("" + lineFlag);
+        stringBuffer.append(html == null ? "" : html);
 
         OutputStream outputStream = socket.getOutputStream();
         outputStream.write(stringBuffer.toString().getBytes());
         outputStream.flush();
-//        outputStream.close();
-
-        System.out.println(stringBuffer.toString());
     }
 
-    private void doGet(String filename) throws IOException {
+    private void doGet(String filename, HashMap<String, String> dataFromPHP) throws IOException {
         System.out.println("GET 请求\t" + filename);
 
-
-        String fileType = getFileType(filename);
-        OutputStream outputStream = socket.getOutputStream();
         StringBuffer stringBuffer = new StringBuffer();
+        OutputStream outputStream = socket.getOutputStream();
 
-        // 读取磁盘文件
-        File file = new File(webServerRoot + filename);
-        if (filename != null && file.exists()) {
-            stringBuffer.append("HTTP/1.1 200 OK\n");
+        if (dataFromPHP == null) {
+            String fileType = getFileType(filename);
 
-            stringBuffer.append("Content-Type: " + fileType + "; charset=UTF-8\n");
-            stringBuffer.append("Connection: closed\n");
+            // 读取磁盘文件
+            File file = new File(webServerRoot + filename);
+            if (filename != null && file.exists()) {
+                stringBuffer.append("HTTP/1.1 200 OK\n");
 
-            stringBuffer.append("Content-Length: " + file.length() + "\n");
+                stringBuffer.append("Content-Type: " + fileType + "; charset=UTF-8\n");
+                stringBuffer.append("Connection: closed\n");
 
-            stringBuffer.append("\n");
-            outputStream.write(stringBuffer.toString().getBytes());
+                stringBuffer.append("Content-Length: " + file.length() + "\n");
 
-            FileInputStream fileInputStream = new FileInputStream(file);
+                stringBuffer.append("\n");
+                outputStream.write(stringBuffer.toString().getBytes());
 
-            DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+                FileInputStream fileInputStream = new FileInputStream(file);
 
-            int len;
-            byte[] buf = new byte[1024];
-            while ((len = fileInputStream.read(buf)) != -1) {
-                dataOutputStream.write(buf, 0, len);
+                DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+
+                int len;
+                byte[] buf = new byte[1024];
+                while ((len = fileInputStream.read(buf)) != -1) {
+                    dataOutputStream.write(buf, 0, len);
+                }
+                fileInputStream.close();
+                dataOutputStream.close();
+
+            } else {
+                String notFoundHtml = "<html>\n" +
+                        "<head><title>404 Not Found</title></head>\n" +
+                        "<body>\n" +
+                        "<center><h1>404 Not Found</h1></center>\n" +
+                        "<hr><center>cg-java-web-server/1.0</center>\n" +
+                        "</body>\n" +
+                        "</html>\n" +
+                        "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                        "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                        "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                        "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                        "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                        "<!-- a padding to disable MSIE and Chrome friendly error page -->";
+                stringBuffer.append("HTTP/1.1 404 Not Found\r\n");
+                stringBuffer.append("Content-Length:" + notFoundHtml.getBytes().length + "\r\n");
+                stringBuffer.append("\r\n");
+                stringBuffer.append(notFoundHtml);
+                outputStream.write(stringBuffer.toString().getBytes());
             }
-            fileInputStream.close();
-            dataOutputStream.close();
-
         } else {
-            String notFoundHtml = "<html>\n" +
-                    "<head><title>404 Not Found</title></head>\n" +
-                    "<body>\n" +
-                    "<center><h1>404 Not Found</h1></center>\n" +
-                    "<hr><center>cg-java-web-server/1.0</center>\n" +
-                    "</body>\n" +
-                    "</html>\n" +
-                    "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
-                    "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
-                    "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
-                    "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
-                    "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
-                    "<!-- a padding to disable MSIE and Chrome friendly error page -->";
-            stringBuffer.append("HTTP/1.1 404 Not Found\r\n");
-            stringBuffer.append("Content-Length:" + notFoundHtml.getBytes().length + "\r\n");
+            String html = dataFromPHP.get("content");
+            String contentType = dataFromPHP.get("ContentType");
+//        String contentType = dataFromPHP.get("Content-Type");
+
+            String httpStatus = dataFromPHP.get("httpStatus");
+            if (httpStatus == null) {
+                httpStatus = "HTTP/1.1 200 OK";
+            }
+
+            stringBuffer.append(httpStatus + "\r\n");
+            stringBuffer.append("Content-Length:" + html.getBytes().length + "\r\n");
+            stringBuffer.append("Content-Type:" + contentType + "\r\n");
             stringBuffer.append("\r\n");
-
-            stringBuffer.append(notFoundHtml);
-
+            stringBuffer.append(html);
             outputStream.write(stringBuffer.toString().getBytes());
-//            outputStream.close();
         }
     }
 
