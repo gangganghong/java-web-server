@@ -27,38 +27,6 @@ public class Test {
         byte[] begin_request = fcgi.fcgiPacket(fcgi_request_type.FCGI_BEGIN_REQUEST, request_id, begin_request_body);
         System.out.println("FCGI_BEGIN_REQUEST:\n" + Base64.getEncoder().encodeToString(begin_request));
         //2.params
-        String entity2 = "POST /post.html HTTP/1.1\n" +
-                "Host: localhost:2000\n" +
-                "Connection: keep-alive\n" +
-                "Content-Length: 254195\n" +
-                "Pragma: no-cache\n" +
-                "Cache-Control: no-cache\n" +
-                "Origin: http://dev.cg.com\n" +
-                "Upgrade-Insecure-Requests: 1\n" +
-                "Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryIqmAOK1WzKVEtB5o\n" +
-                "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36\n" +
-                "Sec-Fetch-User: ?1\n" +
-                "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3\n" +
-                "Sec-Fetch-Site: cross-site\n" +
-                "Sec-Fetch-Mode: navigate\n" +
-                "Referer: http://dev.cg.com/tool/form.html\n" +
-                "Accept-Encoding: gzip, deflate, br\n" +
-                "Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7\n" +
-                "\n" +
-                "------WebKitFormBoundaryIqmAOK1WzKVEtB5o\n" +
-                "Content-Disposition: form-data; name=\"name\"\n" +
-                "\n" +
-                "ç®¡ç\u0090†å‘˜\n" +
-                "------WebKitFormBoundaryIqmAOK1WzKVEtB5o\n" +
-                "Content-Disposition: form-data; name=\"desc\"\n" +
-                "\n" +
-                "å\u0090¾é—®æ— ä¸ºè°“\n" +
-                "------WebKitFormBoundaryIqmAOK1WzKVEtB5o\n" +
-                "Content-Disposition: form-data; name=\"picture\"; filename=\"2015110214261032002.jpg\"\n" +
-                "Content-Type: image/jpeg";
-//        String postData = new String("\r\n------we\r\n" +
-//                "Content-Disposition: form-data; name=\"nameer\"\r\n------234");
-//        String postData = new String("Content-Disposition: form-data;name=\"name\"\r\n------2345WebKitFormBoundaryIqmAOK1WzKVEtB5o--");
         byte[] postDatByte = dataFromWebServer;
         HashMap<String, String> requestHeaders = header.get("requestLine");
         HashMap<String, String> headLine = header.get("headerLine");
@@ -82,7 +50,6 @@ public class Test {
         params.put("SERVER_NAME", "DESKTOP-NCL22GF");
         params.put("SERVER_PROTOCOL", "HTTP/1.1");
         params.put("CONTENT_TYPE", contentType == null ? "" : contentType);
-//        params.put("CONTENT_TYPE", "application/x-www-form-urlencoded");
 
         params.put("CONTENT_LENGTH", "" + (contentLength == null ? 0 : contentLength));
         params.put("AUTHOR", "cg");

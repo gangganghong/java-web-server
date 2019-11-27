@@ -200,9 +200,6 @@ public class WorkThread {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-
-            StringBuffer stringBuffer = new StringBuffer();
-            stringBuffer.append("HTTP/1.1 200 OK\n");
         }
 
         switch (method) {
@@ -306,7 +303,7 @@ public class WorkThread {
                 httpStatus = "HTTP/1.1 200 OK";
             }
 
-            stringBuffer.append(httpStatus + "\r\n");
+            stringBuffer.append("HTTP/1.1 " + httpStatus + "\r\n");
             stringBuffer.append("Content-Length:" + html.getBytes().length + "\r\n");
             stringBuffer.append("Content-Type:" + contentType + "\r\n");
             stringBuffer.append("\r\n");
