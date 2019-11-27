@@ -1,7 +1,10 @@
 package com.company;
 
+
 import java.io.*;
+import java.net.InetAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
@@ -21,6 +24,11 @@ public class WorkThread {
 
     public void run() {
         try {
+
+            System.out.println("socket info start");
+            System.out.println(socket.getPort());
+            System.out.println("socket info end");
+
             InputStream inputStream = socket.getInputStream();
             byte[] buffer = new byte[1];
             int bufferLen;
@@ -179,23 +187,62 @@ public class WorkThread {
         HashMap<String, String> requestLine = header.get("requestLine");
         method = requestLine.get("Method");
         uri = requestLine.get("Uri");
-
         if (method == null) return;
 
-        switch (method) {
-            case "POST":
-                doPost();
-                break;
-            case "GET":
-            default:
-                doGet(uri);
+        if (isDynamicRequest(uri)) {
+            Test test = new Test();
+            HashMap<String, String> dataFromPHP = null;
+            String html;
+            try {
+                dataFromPHP = test.run();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            StringBuffer stringBuffer = new StringBuffer();
+            stringBuffer.append("HTTP/1.1 200 OK\n");
+            html = dataFromPHP.get("content");
+            stringBuffer.append("Content-Length: " + html.getBytes().length + "\n");
+            stringBuffer.append("Content-Type: text/html; charset=UTF-8" + (char) 10 + (char) 13);
+            stringBuffer.append("Connection: closed" + (char) 10 + (char) 13);
+            stringBuffer.append("" + (char) 10 + (char) 13);
+            stringBuffer.append(html);
+
+            OutputStream outputStream = socket.getOutputStream();
+            outputStream.write(stringBuffer.toString().getBytes());
+            outputStream.flush();
+
+            System.out.println(stringBuffer.toString());
+        } else {
+            switch (method) {
+                case "POST":
+                    doPost();
+                    break;
+                case "GET":
+                default:
+                    doGet(uri);
+            }
         }
     }
 
     private void doPost() throws IOException {
+
+        Test test = new Test();
+        HashMap<String, String> dataFromPHP = null;
+        String html;
+        try {
+            dataFromPHP = test.run();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         StringBuffer stringBuffer = new StringBuffer();
         stringBuffer.append("HTTP/1.1 200 OK\n");
-        String html = "<html><head><title>cg</title></head><body><p>I am cg!</p></body></html>" + (char) 10 + (char) 13;
+        if (dataFromPHP == null) {
+            html = "<html><head><title>cg</title></head><body><p>I am cg!</p></body></html>" + (char) 10 + (char) 13;
+        } else {
+            html = dataFromPHP.toString();
+        }
         stringBuffer.append("Content-Length: " + html.getBytes().length + "\n");
         stringBuffer.append("Content-Type: text/html; charset=UTF-8" + (char) 10 + (char) 13);
         stringBuffer.append("Connection: closed" + (char) 10 + (char) 13);
@@ -211,7 +258,7 @@ public class WorkThread {
     }
 
     private void doGet(String filename) throws IOException {
-        System.out.println("GET 请求");
+        System.out.println("GET 请求\t" + filename);
 
 
         String fileType = getFileType(filename);
@@ -360,5 +407,10 @@ public class WorkThread {
         } else {
             return (asciiCode == 10 && preAsciiCode == 13 && prePreAsciiCode == 10);
         }
+    }
+
+    public boolean isDynamicRequest(String uri) {
+        String lowCaseUri = uri.toLowerCase();
+        return lowCaseUri.contains(".php");
     }
 }

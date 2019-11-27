@@ -96,5 +96,20 @@ class WorkThreadTest {
 
     @Test
     void getRequestHeaders() {
+        String str = new String("0");
+        byte[] buff2 = str.getBytes();
+        byte[] buff = new byte[1];
+//        buff[0] = 0;
+        buff[0] = 1;
+        char a = (char)0;
+        System.out.println((char)0);
+    }
+
+    @Test
+    void isDynamicRequest() {
+        String uri1 = "/post.html";
+        assertEquals(false, workThread.isDynamicRequest(uri1));
+        String uri2 = "/post.php";
+        assertEquals(true, workThread.isDynamicRequest(uri2));
     }
 }
