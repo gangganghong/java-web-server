@@ -1,0 +1,32 @@
+{
+  "http": [
+    {
+      "listen": 2000,
+      "server_name": "test.com",
+      "root": "/Users/cg/data/www/cg",
+      "index": [
+        "index.html",
+        "index.php"
+      ]
+    },
+    {
+      "listen": 2001,
+      "server_name": "test2.com",
+      "root": "/Users/cg/data/www/parse-mysql-sql",
+      "index": [
+        "index.html",
+        "index.php"
+      ],
+      "proxy_pass": "127.0.0.1:80"
+    },
+    {
+      "listen": 2003,
+      "server_name": "test3.com",
+      "root": "/Users/cg/data/code/wheel/java/demo/html",
+      "index": [
+        "index.html",
+        "index.php"
+      ]
+    }
+  ]
+}

@@ -1,15 +1,21 @@
 package com.company;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.net.Socket;
-import java.util.HashMap;
+import java.nio.ByteBuffer;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class WorkThreadTest {
 
-    WorkThread workThread = new WorkThread(new Socket());
+    WorkThread workThread = new WorkThread();
 
     @org.junit.jupiter.api.Test
     void run() {
@@ -33,7 +39,6 @@ class WorkThreadTest {
         actualFileMeta = workThread.parseFileMeta(line, actualFileMeta);
         actualFileMeta = workThread.parseFileMeta(line2, actualFileMeta);
         assertEquals(expectedFileMeta, actualFileMeta);
-
 
 
 //        Content-Type: text/html
@@ -101,8 +106,8 @@ class WorkThreadTest {
         byte[] buff = new byte[1];
 //        buff[0] = 0;
         buff[0] = 1;
-        char a = (char)0;
-        System.out.println((char)0);
+        char a = (char) 0;
+        System.out.println((char) 0);
     }
 
     @Test
@@ -111,5 +116,98 @@ class WorkThreadTest {
         assertEquals(false, workThread.isDynamicRequest(uri1));
         String uri2 = "/post.php";
         assertEquals(true, workThread.isDynamicRequest(uri2));
+    }
+
+    @Test
+    void tool() {
+
+//        for (int i = 0; i < features.size(); i++) {
+//            String ff = features.getJSONObject(i).getString("properties");
+//            JSONObject jsonObject = JSON.parseObject(ff);
+//            System.out.print("cp:" + JSON.parseObject(ff).getJSONArray("cp").get(0) + " " + JSON.parseObject(ff).getJSONArray("cp").get(1)); //这一行是解析cp数组里的东西
+//            System.out.print(ff + " ");
+//            System.out.print("childNum:" + jsonObject.getString("childNum") + "  ");
+//            System.out.print("id:" + jsonObject.getString("id") + "  ");
+//            System.out.println("name:" + jsonObject.getString("name"));
+//        }
+    }
+
+    public class Grade {
+
+        private Long id;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public List<Student> getUsers() {
+            return users;
+        }
+
+        public void setUsers(List<Student> users) {
+            this.users = users;
+        }
+
+        private String name;
+
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        private List<Student> users = new ArrayList<Student>();
+
+        // 省略 setter、getter
+
+        public void addStudent(Student student) {
+            users.add(student);
+        }
+
+        @Override
+        public String toString() {
+            return "Grade{" +
+                    "id=" + id +
+                    ", name='" + name + '\'' +
+                    ", users=" + users +
+                    '}';
+        }
+    }
+
+    public class Student {
+
+        private Long id;
+        private String name;
+
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+// 省略 setter、getter
+
+        @Override
+        public String toString() {
+            return "Student{" +
+                    "id=" + id +
+                    ", name='" + name + '\'' +
+                    '}';
+        }
     }
 }

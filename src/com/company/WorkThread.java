@@ -2,17 +2,27 @@ package com.company;
 
 
 import java.io.*;
+import java.net.ConnectException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.StringTokenizer;
 
 public class WorkThread {
-    private final String webServerRoot = "/Users/cg/data/code/wheel/java/demo/html";
+    private String webServerRoot;
     private Socket socket;
+    private HashMap<String, String> serverConfig;
 
-    public WorkThread(Socket socket) {
+    public WorkThread() {
+
+    }
+
+    public WorkThread(Socket socket, HashMap<String, String> serverConfig) {
         this.socket = socket;
+        this.serverConfig = serverConfig;
+        webServerRoot = serverConfig.get("root");
     }
 
 //        错误
@@ -163,8 +173,15 @@ public class WorkThread {
                     allDataTmp.flip();
                     byte[] allData = new byte[allDataTmp.remaining()];
                     allDataTmp.get(allData);
-                    proxy(allData, socket);
-//                    doRequest(header, allData);
+                    String proxyPass = serverConfig.get("proxy_pass");
+                    System.out.println("proxy start");
+                    System.out.println(Thread.currentThread().getName() + "\t" + proxyPass);
+                    System.out.println("proxy end");
+                    if (proxyPass != null) {
+                        proxy(allData, socket, proxyPass);
+                    } else {
+                        doRequest(header, allData);
+                    }
                     break;
                 }
 
@@ -184,11 +201,24 @@ public class WorkThread {
     }
 
     private void doRequest(HashMap<String, HashMap> header, byte[] data) throws IOException {
+
         if (header == null || header.isEmpty()) return;
+
+        HashMap<String, String> requestLine = header.get("requestLine");
+        HashMap<String, String> headerLine = header.get("headerLine");
+        StringBuffer stringBuffer = new StringBuffer();
+        OutputStream outputStream = socket.getOutputStream();
+        String hostAndPort = headerLine.get("Host");
+        String host = hostAndPort.substring(0, hostAndPort.indexOf(":"));
+        String serverName = serverConfig.get("host");
+        if (!host.trim().equals(serverName.trim())) {
+            response404(stringBuffer, outputStream);
+            return;
+        }
 
         String method;
         String uri;
-        HashMap<String, String> requestLine = header.get("requestLine");
+
         method = requestLine.get("Method");
         uri = requestLine.get("Uri");
         if (method == null) return;
@@ -197,7 +227,7 @@ public class WorkThread {
         if (isDynamicRequest(uri)) {
             Test test = new Test();
             try {
-                dataFromPHP = test.run(header, data);
+                dataFromPHP = test.run(header, data, webServerRoot);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -219,16 +249,16 @@ public class WorkThread {
         String contenType = "";
         if (dataFromPHP != null) {
             html = dataFromPHP.get("content");
-            contenType = dataFromPHP.get("Content-Type");
+            contenType = dataFromPHP.get("ContentType");
             httpStatus = dataFromPHP.get("httpStatus");
         }
 
         if (httpStatus == null) {
-            httpStatus = "HTTP/1.1 200 OK";
+            httpStatus = "200 OK";
         }
         String lineFlag = "" + (char) 10 + (char) 13;
         StringBuffer stringBuffer = new StringBuffer();
-        stringBuffer.append(httpStatus + lineFlag);
+        stringBuffer.append("HTTP/1.1 " + httpStatus + lineFlag);
         stringBuffer.append("Content-Length: " + html.getBytes().length + lineFlag);
         stringBuffer.append("Content-Type: " + contenType + lineFlag);
         stringBuffer.append("Connection: closed" + lineFlag);
@@ -275,29 +305,12 @@ public class WorkThread {
                 dataOutputStream.close();
 
             } else {
-                String notFoundHtml = "<html>\n" +
-                        "<head><title>404 Not Found</title></head>\n" +
-                        "<body>\n" +
-                        "<center><h1>404 Not Found</h1></center>\n" +
-                        "<hr><center>cg-java-web-server/1.0</center>\n" +
-                        "</body>\n" +
-                        "</html>\n" +
-                        "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
-                        "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
-                        "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
-                        "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
-                        "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
-                        "<!-- a padding to disable MSIE and Chrome friendly error page -->";
-                stringBuffer.append("HTTP/1.1 404 Not Found\r\n");
-                stringBuffer.append("Content-Length:" + notFoundHtml.getBytes().length + "\r\n");
-                stringBuffer.append("\r\n");
-                stringBuffer.append(notFoundHtml);
-                outputStream.write(stringBuffer.toString().getBytes());
+                response404(stringBuffer, outputStream);
+                outputStream.close();
             }
         } else {
             String html = dataFromPHP.get("content");
             String contentType = dataFromPHP.get("ContentType");
-//        String contentType = dataFromPHP.get("Content-Type");
 
             String httpStatus = dataFromPHP.get("httpStatus");
             if (httpStatus == null) {
@@ -311,6 +324,27 @@ public class WorkThread {
             stringBuffer.append(html);
             outputStream.write(stringBuffer.toString().getBytes());
         }
+    }
+
+    private void response404(StringBuffer stringBuffer, OutputStream outputStream) throws IOException {
+        String notFoundHtml = "<html>\n" +
+                "<head><title>404 Not Found</title></head>\n" +
+                "<body>\n" +
+                "<center><h1>404 Not Found</h1></center>\n" +
+                "<hr><center>cg-java-web-server/1.0</center>\n" +
+                "</body>\n" +
+                "</html>\n" +
+                "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                "<!-- a padding to disable MSIE and Chrome friendly error page -->";
+        stringBuffer.append("HTTP/1.1 404 Not Found\r\n");
+        stringBuffer.append("Content-Length:" + notFoundHtml.getBytes().length + "\r\n");
+        stringBuffer.append("\r\n");
+        stringBuffer.append(notFoundHtml);
+        outputStream.write(stringBuffer.toString().getBytes());
     }
 
     private String getFileType(String filePath) {
@@ -413,16 +447,67 @@ public class WorkThread {
     }
 
     // 反向代理功能
-    private void proxy(byte[] requestData, Socket originalSocket) throws IOException{
-        Socket socket = new Socket("127.0.0.1", 80);
-        OutputStream outputStream = socket.getOutputStream();
-        outputStream.write(requestData);
+    private void proxy(byte[] requestData, Socket originalSocket, String proxyPass) throws IOException {
+        String[] hostAndPort = proxyPass.split(":");
+        String host = hostAndPort[0];
+        int port;
+        if (hostAndPort.length > 1) {
+            port = Integer.parseInt(hostAndPort[1]);
+        } else {
+            port = 80;
+        }
 
-        InputStream inputStream = socket.getInputStream();
-        byte[] buff = new byte[1024];
-        OutputStream outputStream1 = originalSocket.getOutputStream();
-        while(inputStream.read(buff) != -1){
-            outputStream1.write(buff);
+        try {
+            Socket socket = new Socket();
+            SocketAddress socketAddress = new InetSocketAddress(host, port);
+            socket.connect(socketAddress, 100);
+            InputStream inputStream = socket.getInputStream();
+
+            OutputStream outputStream = socket.getOutputStream();
+            outputStream.write(requestData);
+
+            byte[] buff = new byte[1024];
+            OutputStream outputStream1 = originalSocket.getOutputStream();
+            while (inputStream.read(buff) != -1) {
+                outputStream1.write(buff);
+            }
+
+        } catch (Exception e) {
+            // todo 有待调整，代理服务器的问题，归结为502，更具有概括性
+            e.printStackTrace();
+
+            response504();
+
+            return;
+        }
+    }
+
+    private void response504() {
+        String html = "<html>\n" +
+                "<head><title>504 Gateway timeout</title></head>\n" +
+                "<body>\n" +
+                "<center><h1>504 Gateway timeou</h1></center>\n" +
+                "<hr><center>cg-java-web-server/1.0</center>\n" +
+                "</body>\n" +
+                "</html>\n" +
+                "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
+                "<!-- a padding to disable MSIE and Chrome friendly error page -->";
+
+        StringBuffer stringBuffer = new StringBuffer();
+        stringBuffer.append("HTTP/1.1 504 Gateway timeout\r\n");
+        stringBuffer.append("Content-Length:" + html.getBytes().length + "\r\n");
+        stringBuffer.append("\r\n");
+        stringBuffer.append(html);
+        OutputStream outputStream;
+        try {
+            outputStream = socket.getOutputStream();
+            outputStream.write(stringBuffer.toString().getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }

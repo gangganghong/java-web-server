@@ -9,9 +9,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class Test {
-    private String webServerRoot = "/Users/cg/data/www/cg/tool";
 
-    public HashMap<String, String> run(HashMap<String, HashMap> header, byte[] dataFromWebServer) throws Exception {
+    public HashMap<String, String> run(HashMap<String, HashMap> header, byte[] dataFromWebServer, String webServerRoot) throws Exception {
         Socket client = new Socket("127.0.0.1", 9000);
 
         InputStream in = client.getInputStream();
@@ -25,7 +24,7 @@ public class Test {
         begin_request_body[1] = fcgi_role.FCGI_RESPONDER; //roleB0
         begin_request_body[2] = 0; // flags
         byte[] begin_request = fcgi.fcgiPacket(fcgi_request_type.FCGI_BEGIN_REQUEST, request_id, begin_request_body);
-        System.out.println("FCGI_BEGIN_REQUEST:\n" + Base64.getEncoder().encodeToString(begin_request));
+        // System.out.println("FCGI_BEGIN_REQUEST:\n" + Base64.getEncoder().encodeToString(begin_request));
         //2.params
         byte[] postDatByte = dataFromWebServer;
         HashMap<String, String> requestHeaders = header.get("requestLine");
@@ -54,25 +53,25 @@ public class Test {
         params.put("CONTENT_LENGTH", "" + (contentLength == null ? 0 : contentLength));
         params.put("AUTHOR", "cg");
 
-        System.out.println("\nparam pair base64:");
+        // System.out.println("\nparam pair base64:");
         ByteBuffer paramContainer = ByteBuffer.allocate(1024);
         for (String key : params.keySet()) {
             byte[] onePair = fcgi.fcgiParam(key, params.get(key));
             paramContainer.put(onePair);
 
-            System.out.println(key + " - " + params.get(key) + ": " + Base64.getEncoder().encodeToString(onePair));
+            // System.out.println(key + " - " + params.get(key) + ": " + Base64.getEncoder().encodeToString(onePair));
         }
         paramContainer.flip();
         byte[] fcgi_param_byte = new byte[paramContainer.remaining()];
         paramContainer.get(fcgi_param_byte);
         byte[] fcgi_params = fcgi.fcgiPacket(fcgi_request_type.FCGI_PARAMS, request_id, fcgi_param_byte);
 
-        System.out.println("\nFCGI_PARAMS:\n" + Base64.getEncoder().encodeToString(fcgi_params));
+        // System.out.println("\nFCGI_PARAMS:\n" + Base64.getEncoder().encodeToString(fcgi_params));
         byte[] fcgi_params_end = fcgi.fcgiPacket(fcgi_request_type.FCGI_PARAMS, request_id, new byte[0]);
-        System.out.println("\nFCGI_PARAMS end with empty content:\n" + Base64.getEncoder().encodeToString(fcgi_params_end));
+        // System.out.println("\nFCGI_PARAMS end with empty content:\n" + Base64.getEncoder().encodeToString(fcgi_params_end));
         //3.stdin
         byte[] fcgi_stdin = fcgi.fcgiPacket(fcgi_request_type.FCGI_STDIN, request_id, postDatByte);
-        System.out.println("\nFCGI_STDIN:\n" + Base64.getEncoder().encodeToString(fcgi_stdin));
+        // System.out.println("\nFCGI_STDIN:\n" + Base64.getEncoder().encodeToString(fcgi_stdin));
 
         byte[] end_request_body = new byte[8];
         end_request_body[0] = (byte) ((0 >> 24) & 0xff);
@@ -90,39 +89,39 @@ public class Test {
         onePacket.put(end_request);
 
         onePacket.flip();
-        System.out.println("\nall:\n" + onePacket);
+        // System.out.println("\nall:\n" + onePacket);
 
         out.write(onePacket.array());
 
-        System.out.println("\noutput:");
+        // System.out.println("\noutput:");
         byte[] buf = new byte[8];
 
         boolean startContent = false;
-        ByteBuffer byteBuffer = ByteBuffer.allocate(1024*1024);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(1024 * 1024);
         while (in.read(buf) != -1) {
-            if(!startContent && (buf[1] == 5 || buf[1] == 6 || buf[1] == 7)){
+            if (!startContent && (buf[1] == 5 || buf[1] == 6 || buf[1] == 7)) {
                 startContent = true;
                 continue;
             }
 
-            if(startContent && buf[1] == 3){
+            if (startContent && buf[1] == 3) {
                 startContent = false;
             }
 
-            if(startContent){
+            if (startContent) {
                 byteBuffer.put(buf);
             }
 
         }
-        System.out.println("from php start");
+        // System.out.println("from php start");
 //        这个方法，留意
         byteBuffer.flip();
         byte[] data = new byte[byteBuffer.remaining()];
         byteBuffer.get(data);
 
         String resultFromPHP = new String(data, "UTF-8");
-        System.out.println(resultFromPHP);
-        System.out.println("from php end\t结束");
+        // System.out.println(resultFromPHP);
+        // System.out.println("from php end\t结束");
         int headerEndIndex = resultFromPHP.indexOf("\r\n\r\n");
         String headerStr = resultFromPHP.substring(0, headerEndIndex);
         String[] headerArr = headerStr.split("\r\n");
@@ -131,13 +130,13 @@ public class Test {
         String powered;
         String phpDataContentType;
 
-        if(headerArr.length > 2){
+        if (headerArr.length > 2) {
 //            Primary script unknown\nStatus: 404 Not Found
             httpStatus = headerArr[0].split(":")[1];
             powered = headerArr[1];
             phpDataContentType = headerArr[2].split(":")[1];
 //            phpDataContentType = headerArr[3].split(":")[1];
-        }else{
+        } else {
             powered = headerArr[0];
             phpDataContentType = headerArr[1].split(":")[1];
         }
