@@ -7,6 +7,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.StringTokenizer;
 
@@ -280,7 +281,18 @@ public class WorkThread {
             String fileType = getFileType(filename);
 
             // 读取磁盘文件
-            File file = new File(webServerRoot + filename);
+            String absolutePath = webServerRoot + filename;
+            File file = new File(absolutePath);
+            if (file.isDirectory()) {
+                String indexesHtml = getRootIndexHtml(absolutePath, filename);
+                String html = "HTTP/1.1 200 OK\r\nContent-Type: text/html;charset=UTF-8\r\n";
+                html += "Content-Length: " + indexesHtml.length() + "\r\n";
+                html += "Connection: closed\r\n\r\n";
+                html += indexesHtml;
+                OutputStream outputStream1 = socket.getOutputStream();
+                outputStream1.write(html.getBytes());
+                return;
+            }
             if (filename != null && file.exists()) {
                 stringBuffer.append("HTTP/1.1 200 OK\n");
 
@@ -509,5 +521,52 @@ public class WorkThread {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private ArrayList<HashMap> showIndex(String dirname) {
+        File dir = new File(dirname);
+        File[] files = dir.listFiles();
+        ArrayList<HashMap> indexes = new ArrayList<>();
+
+        for (File file : files) {
+            HashMap<String, String> fileMeta = new HashMap<>();
+            String name = file.getName();
+            String lastModified = String.valueOf(file.lastModified());
+            String length;
+
+            if (file.isDirectory()) {
+                length = "-";
+            } else {
+                length = Long.toString(file.length());
+            }
+
+            fileMeta.put("name", name);
+            fileMeta.put("lastModified", lastModified);
+            fileMeta.put("length", length);
+
+            indexes.add(fileMeta);
+        }
+
+        return indexes;
+    }
+
+    private String getRootIndexHtml(String dirname, String uri) {
+        ArrayList<HashMap> indexes = showIndex(dirname);
+        String html = "<html>\n" +
+                "<head><title>Index of /</title></head>\n" +
+                "<body>\n<h1>Index of /</h1><hr><pre><a href=\"../\">../</a>";
+        for (HashMap<String, String> index : indexes) {
+            String name = index.get("name");
+            String fullName = uri.replaceAll("/", "") + "/" + name;
+            String lastModified = index.get("lastModified");
+            String length = index.get("length");
+            html += "<a href=\"" + fullName + "\">" + (name.replaceAll("/", "")) + "</a>"
+                    + "             " + lastModified + "            " + length + "\n";
+        }
+
+        html += "</pre><hr></body>\n" +
+                "</html>";
+
+        return html;
     }
 }
