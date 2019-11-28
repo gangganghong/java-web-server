@@ -359,13 +359,14 @@ public class WorkThread {
         outputStream.write(stringBuffer.toString().getBytes());
     }
 
+    // todo 比较专业和繁琐，先简化处理
     private String getFileType(String filePath) {
         String fileType = "text/plain";
 
         if (filePath.endsWith("html")) {
             fileType = "text/html";
         } else {
-            fileType = "image/jpeg";
+//            fileType = "image/jpeg";
         }
 
         return fileType;
@@ -554,18 +555,17 @@ public class WorkThread {
         ArrayList<HashMap> indexes = showIndex(dirname);
         String html = "<html>\n" +
                 "<head><title>Index of /</title></head>\n" +
-                "<body>\n<h1>Index of /</h1><hr><pre><a href=\"../\">../</a>";
+                "<body>\n<h1>Index of /</h1><hr><pre><a href=\"../\">../</a>\n";
         for (HashMap<String, String> index : indexes) {
             String name = index.get("name");
-            String fullName = uri.replaceAll("/", "") + "/" + name;
+            String fullName = uri + "/" + name;
             String lastModified = index.get("lastModified");
             String length = index.get("length");
             html += "<a href=\"" + fullName + "\">" + (name.replaceAll("/", "")) + "</a>"
                     + "             " + lastModified + "            " + length + "\n";
         }
 
-        html += "</pre><hr></body>\n" +
-                "</html>";
+        html += "</pre><hr></body>\n</html>";
 
         return html;
     }
