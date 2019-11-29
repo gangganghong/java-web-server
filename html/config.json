@@ -17,7 +17,8 @@
         "index.html",
         "index.php"
       ],
-      "proxy_pass": "127.0.0.1:80"
+      "proxy_pass": "127.0.0.1:80",
+      "access_log":"/Users/cg/data/code/wheel/java/demo/html/access_log"
     },
     {
       "listen": 2003,
@@ -26,7 +27,8 @@
       "index": [
         "index.html",
         "index.php"
-      ]
+      ],
+      "access_log":"/Users/cg/data/code/wheel/java/demo/html/access_log"
     }
   ]
 }

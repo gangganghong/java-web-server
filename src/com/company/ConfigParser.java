@@ -41,10 +41,12 @@ public class ConfigParser {
             String proxyPass = features.getJSONObject(i).getString("proxy_pass");
 //            todo 解析嵌套json
             String index = features.getJSONObject(i).getString("index");
+            String accessLog = features.getJSONObject(i).getString("access_log");
             serverConfig.put("host", host);
             serverConfig.put("port", listen);
             serverConfig.put("root", root);
             serverConfig.put("proxy_pass", proxyPass);
+            serverConfig.put("access_log", accessLog);
             config.put(host, serverConfig);
         }
 

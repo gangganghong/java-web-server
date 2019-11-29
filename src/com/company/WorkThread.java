@@ -180,7 +180,7 @@ public class WorkThread {
                     System.out.println(Thread.currentThread().getName() + "\t" + proxyPass);
                     System.out.println("proxy end");
                     if (proxyPass != null) {
-                        proxy(allData, socket, proxyPass);
+                        proxy(allData, socket, proxyPass, header);
                     } else {
                         doRequest(header, allData);
                     }
@@ -214,7 +214,10 @@ public class WorkThread {
         String host = hostAndPort.substring(0, hostAndPort.indexOf(":"));
         String serverName = serverConfig.get("host");
         if (!host.trim().equals(serverName.trim())) {
-            response404(stringBuffer, outputStream);
+            int contentLength = response404(stringBuffer, outputStream);
+
+            saveAccessLog(requestLine, headerLine, host, 404 + "", String.valueOf(contentLength));
+
             return;
         }
 
@@ -237,31 +240,42 @@ public class WorkThread {
 
         switch (method) {
             case "POST":
-                doPost(dataFromPHP);
+                doPost(dataFromPHP, requestLine, headerLine, host);
                 break;
             case "GET":
             default:
-                doGet(uri, dataFromPHP);
+                doGet(uri, dataFromPHP, requestLine, headerLine, host);
         }
     }
 
-    private void doPost(HashMap<String, String> dataFromPHP) throws IOException {
+    private void doPost(
+            HashMap<String, String> dataFromPHP,
+            HashMap<String, String> requestLine,
+            HashMap<String, String> headerLine,
+            String host
+    ) throws IOException {
         String httpStatus = null;
         String html = null;
         String contenType = "";
+        String httpCode = "200";
         if (dataFromPHP != null) {
             html = dataFromPHP.get("content");
             contenType = dataFromPHP.get("ContentType");
             httpStatus = dataFromPHP.get("httpStatus");
+            String[] httpStatusArr = httpStatus.split(" ");
+            if (httpStatusArr.length > 0) {
+                httpCode = httpStatusArr[0];
+            }
         }
 
         if (httpStatus == null) {
-            httpStatus = "200 OK";
+            httpStatus = httpCode + " OK";
         }
+        int contentLength = html.getBytes().length;
         String lineFlag = "" + (char) 10 + (char) 13;
         StringBuffer stringBuffer = new StringBuffer();
         stringBuffer.append("HTTP/1.1 " + httpStatus + lineFlag);
-        stringBuffer.append("Content-Length: " + html.getBytes().length + lineFlag);
+        stringBuffer.append("Content-Length: " + contentLength + lineFlag);
         stringBuffer.append("Content-Type: " + contenType + lineFlag);
         stringBuffer.append("Connection: closed" + lineFlag);
         stringBuffer.append("" + lineFlag);
@@ -270,9 +284,16 @@ public class WorkThread {
         OutputStream outputStream = socket.getOutputStream();
         outputStream.write(stringBuffer.toString().getBytes());
         outputStream.flush();
+
+        saveAccessLog(requestLine, headerLine, host, httpCode + "", String.valueOf(contentLength));
     }
 
-    private void doGet(String filename, HashMap<String, String> dataFromPHP) throws IOException {
+    private void doGet(String filename,
+                       HashMap<String, String> dataFromPHP,
+                       HashMap<String, String> requestLine,
+                       HashMap<String, String> headerLine,
+                       String host
+    ) throws IOException {
         System.out.println("GET 请求\t" + filename);
 
         StringBuffer stringBuffer = new StringBuffer();
@@ -285,22 +306,28 @@ public class WorkThread {
             String absolutePath = webServerRoot + filename;
             File file = new File(absolutePath);
             if (file.isDirectory()) {
+                int httpCode = 200;
                 String indexesHtml = getRootIndexHtml(absolutePath, filename);
-                String html = "HTTP/1.1 200 OK\r\nContent-Type: text/html;charset=UTF-8\r\n";
-                html += "Content-Length: " + indexesHtml.length() + "\r\n";
+                String html = "HTTP/1.1 " + httpCode + " OK\r\nContent-Type: text/html;charset=UTF-8\r\n";
+                int contentLength = indexesHtml.length();
+                html += "Content-Length: " + contentLength + "\r\n";
                 html += "Connection: closed\r\n\r\n";
                 html += indexesHtml;
                 OutputStream outputStream1 = socket.getOutputStream();
                 outputStream1.write(html.getBytes());
+
+                saveAccessLog(requestLine, headerLine, host, httpCode + "", String.valueOf(contentLength));
+
                 return;
             }
             if (filename != null && file.exists()) {
-                stringBuffer.append("HTTP/1.1 200 OK\n");
+                int httpCode = 200;
+                stringBuffer.append("HTTP/1.1 " + httpCode + " OK\n");
 
                 stringBuffer.append("Content-Type: " + fileType + "; charset=UTF-8\n");
                 stringBuffer.append("Connection: closed\n");
-
-                stringBuffer.append("Content-Length: " + file.length() + "\n");
+                Long contentLength = file.length();
+                stringBuffer.append("Content-Length: " + contentLength + "\n");
 
                 stringBuffer.append("\n");
                 outputStream.write(stringBuffer.toString().getBytes());
@@ -317,9 +344,15 @@ public class WorkThread {
                 fileInputStream.close();
                 dataOutputStream.close();
 
+                saveAccessLog(requestLine, headerLine, host, httpCode + "", String.valueOf(contentLength));
+
             } else {
-                response404(stringBuffer, outputStream);
+                int contentLength = response404(stringBuffer, outputStream);
                 outputStream.close();
+
+                int httpCode = 404;
+
+                saveAccessLog(requestLine, headerLine, host, httpCode + "", String.valueOf(contentLength));
             }
         } else {
             String html = dataFromPHP.get("content");
@@ -330,16 +363,35 @@ public class WorkThread {
                 httpStatus = "HTTP/1.1 200 OK";
             }
 
+            int contentLength = html.getBytes().length;
             stringBuffer.append("HTTP/1.1 " + httpStatus + "\r\n");
-            stringBuffer.append("Content-Length:" + html.getBytes().length + "\r\n");
+            stringBuffer.append("Content-Length:" + contentLength + "\r\n");
             stringBuffer.append("Content-Type:" + contentType + "\r\n");
             stringBuffer.append("\r\n");
             stringBuffer.append(html);
             outputStream.write(stringBuffer.toString().getBytes());
+
+            int httpCode = 404;
+
+            saveAccessLog(requestLine, headerLine, host, httpCode + "", String.valueOf(contentLength));
         }
     }
 
-    private void response404(StringBuffer stringBuffer, OutputStream outputStream) throws IOException {
+    private void saveAccessLog(HashMap<String, String> requestLine, HashMap<String, String> headerLine, String host, String s, String s2) {
+        HashMap<String, String> logContent = new HashMap<>();
+        logContent.put("host", host);
+        Date date = new Date();
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("YY-MM-D H:M:s");
+        logContent.put("date", simpleDateFormat.format(date));
+        logContent.put("requestLine", requestLine.get("Method") + " " + requestLine.get("Uri") + " " + requestLine.get("Http").replaceAll("\r", ""));
+        logContent.put("httpCode", s);
+        logContent.put("contentLength", s2);
+        logContent.put("userAgent", headerLine.get("User-Agent"));
+        String accessLog = serverConfig.get("access_log");
+        ServerLog.accessLog(logContent, accessLog);
+    }
+
+    private int response404(StringBuffer stringBuffer, OutputStream outputStream) throws IOException {
         String notFoundHtml = "<html>\n" +
                 "<head><title>404 Not Found</title></head>\n" +
                 "<body>\n" +
@@ -354,10 +406,13 @@ public class WorkThread {
                 "<!-- a padding to disable MSIE and Chrome friendly error page -->\n" +
                 "<!-- a padding to disable MSIE and Chrome friendly error page -->";
         stringBuffer.append("HTTP/1.1 404 Not Found\r\n");
-        stringBuffer.append("Content-Length:" + notFoundHtml.getBytes().length + "\r\n");
+        int contentLength = notFoundHtml.getBytes().length;
+        stringBuffer.append("Content-Length:" + contentLength + "\r\n");
         stringBuffer.append("\r\n");
         stringBuffer.append(notFoundHtml);
         outputStream.write(stringBuffer.toString().getBytes());
+
+        return contentLength;
     }
 
     // todo 比较专业和繁琐，先简化处理
@@ -461,7 +516,18 @@ public class WorkThread {
     }
 
     // 反向代理功能
-    private void proxy(byte[] requestData, Socket originalSocket, String proxyPass) throws IOException {
+    private void proxy(
+            byte[] requestData,
+            Socket originalSocket,
+            String proxyPass,
+            HashMap<String, HashMap> header
+    ) throws IOException {
+
+        if (header == null || header.isEmpty()) return;
+
+        HashMap<String, String> requestLine = header.get("requestLine");
+        HashMap<String, String> headerLine = header.get("headerLine");
+
         String[] hostAndPort = proxyPass.split(":");
         String host = hostAndPort[0];
         int port;
@@ -486,17 +552,27 @@ public class WorkThread {
                 outputStream1.write(buff);
             }
 
+            // todo 并不是这两个值，正确的值需要从php-fpm返回的数据中提取
+            int contentLength = 100;
+            int httpCode = 200;
+
+            saveAccessLog(requestLine, headerLine, host, httpCode + "", String.valueOf(contentLength));
+
         } catch (Exception e) {
             // todo 有待调整，代理服务器的问题，归结为502，更具有概括性
             e.printStackTrace();
 
-            response504();
+            int contentLength = response504();
+
+            int httpCode = 504;
+
+            saveAccessLog(requestLine, headerLine, host, httpCode + "", String.valueOf(contentLength));
 
             return;
         }
     }
 
-    private void response504() {
+    private int response504() {
         String html = "<html>\n" +
                 "<head><title>504 Gateway timeout</title></head>\n" +
                 "<body>\n" +
@@ -513,7 +589,8 @@ public class WorkThread {
 
         StringBuffer stringBuffer = new StringBuffer();
         stringBuffer.append("HTTP/1.1 504 Gateway timeout\r\n");
-        stringBuffer.append("Content-Length:" + html.getBytes().length + "\r\n");
+        int contentLength = html.getBytes().length;
+        stringBuffer.append("Content-Length:" + contentLength + "\r\n");
         stringBuffer.append("\r\n");
         stringBuffer.append(html);
         OutputStream outputStream;
@@ -523,6 +600,8 @@ public class WorkThread {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        return contentLength;
     }
 
     private ArrayList<HashMap> showIndex(String dirname) {
@@ -585,28 +664,28 @@ public class WorkThread {
         byte[] uriArr = uri.getBytes();
         int uriLength = uriArr.length;
         String suffix = "";
-        while (uriLength >= 1){
+        while (uriLength >= 1) {
             byte element = uriArr[uriLength - 1];
-            if(element != '/'){
+            if (element != '/') {
                 break;
-            }else{
+            } else {
                 suffix += '/';
                 uriLength--;
             }
         }
 
         String formatedUri = uri;
-        if(!suffix.equals("")){
+        if (!suffix.equals("")) {
             formatedUri = uri.replaceAll(suffix, "/");
         }
 
-        if(!formatedUri.endsWith("/")){
+        if (!formatedUri.endsWith("/")) {
             formatedUri += "/";
         }
         return formatedUri;
     }
 
-    private String formateFileLastModified(long lastModified){
+    private String formateFileLastModified(long lastModified) {
         Date date = new Date();
         date.setTime(lastModified);
 //        12-Nov-2018 16:51
