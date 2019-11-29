@@ -2,12 +2,13 @@ package com.company;
 
 
 import java.io.*;
-import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.StringTokenizer;
 
@@ -532,7 +533,7 @@ public class WorkThread {
         for (File file : files) {
             HashMap<String, String> fileMeta = new HashMap<>();
             String name = file.getName();
-            String lastModified = String.valueOf(file.lastModified());
+            String lastModified = formateFileLastModified(file.lastModified());
             String length;
 
             if (file.isDirectory()) {
@@ -540,8 +541,15 @@ public class WorkThread {
             } else {
                 length = Long.toString(file.length());
             }
+            String[] nameArr = name.split("/");
+            int nameArrLenth = nameArr.length;
+            String nameWithoutPath = "";
 
-            fileMeta.put("name", name);
+            if (nameArrLenth >= 1) {
+                nameWithoutPath = nameArr[nameArr.length - 1];
+            }
+
+            fileMeta.put("name", nameWithoutPath);
             fileMeta.put("lastModified", lastModified);
             fileMeta.put("length", length);
 
@@ -552,13 +560,16 @@ public class WorkThread {
     }
 
     private String getRootIndexHtml(String dirname, String uri) {
+
+        String formatedUri = formatUri(uri);
+
         ArrayList<HashMap> indexes = showIndex(dirname);
         String html = "<html>\n" +
                 "<head><title>Index of /</title></head>\n" +
                 "<body>\n<h1>Index of /</h1><hr><pre><a href=\"../\">../</a>\n";
         for (HashMap<String, String> index : indexes) {
             String name = index.get("name");
-            String fullName = uri + "/" + name;
+            String fullName = formatedUri + name;
             String lastModified = index.get("lastModified");
             String length = index.get("length");
             html += "<a href=\"" + fullName + "\">" + (name.replaceAll("/", "")) + "</a>"
@@ -568,5 +579,41 @@ public class WorkThread {
         html += "</pre><hr></body>\n</html>";
 
         return html;
+    }
+
+    private String formatUri(String uri) {
+        byte[] uriArr = uri.getBytes();
+        int uriLength = uriArr.length;
+        String suffix = "";
+        while (uriLength >= 1){
+            byte element = uriArr[uriLength - 1];
+            if(element != '/'){
+                break;
+            }else{
+                suffix += '/';
+                uriLength--;
+            }
+        }
+
+        String formatedUri = uri;
+        if(!suffix.equals("")){
+            formatedUri = uri.replaceAll(suffix, "/");
+        }
+
+        if(!formatedUri.endsWith("/")){
+            formatedUri += "/";
+        }
+        return formatedUri;
+    }
+
+    private String formateFileLastModified(long lastModified){
+        Date date = new Date();
+        date.setTime(lastModified);
+//        12-Nov-2018 16:51
+        String strPattern = "d-MM-Y h:m:s";
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat(strPattern);
+        String formatedFileLastModified = simpleDateFormat.format(date);
+
+        return formatedFileLastModified;
     }
 }
