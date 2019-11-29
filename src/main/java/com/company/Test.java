@@ -125,7 +125,7 @@ public class Test {
         String headerStr = resultFromPHP.substring(0, headerEndIndex);
         String[] headerArr = headerStr.split("\r\n");
 
-        String httpStatus = null;
+        String httpStatus = "200 OK";
         String powered;
         String phpDataContentType;
 
