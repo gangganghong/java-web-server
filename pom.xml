@@ -14,6 +14,10 @@
     <!-- 版本号 -->
     <version>1.0</version>
 
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
     <build>
         <plugins>
             <plugin>
@@ -35,7 +39,7 @@
                     <archive>
                         <manifest>
                             <!-- 此处指定main方法入口的class -->
-                            <mainClass>Server</mainClass>
+                            <mainClass>com.company.Server</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
