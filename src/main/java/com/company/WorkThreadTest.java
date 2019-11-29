@@ -37,7 +37,7 @@ class WorkThreadTest {
 //        Content-Type: text/html
     }
 
-    @Test
+    @org.junit.jupiter.api.Test
     void parseHeadLines() {
         String headLines = "POST /post.html HTTP/1.1\n" +
                 "Host: localhost:2000\n" +
@@ -64,7 +64,7 @@ class WorkThreadTest {
         assertEquals(expectedResult, acutalResult);
     }
 
-    @Test
+    @org.junit.jupiter.api.Test
     void parseRequestLine() {
         String headLines = "POST /post.html HTTP/1.1\n" +
                 "Host: localhost:2000\n" +
@@ -92,7 +92,7 @@ class WorkThreadTest {
         assertEquals(expectedResult, acutalResult);
     }
 
-    @Test
+    @org.junit.jupiter.api.Test
     void getRequestHeaders() {
         String str = new String("0");
         byte[] buff2 = str.getBytes();
@@ -103,7 +103,7 @@ class WorkThreadTest {
         System.out.println((char) 0);
     }
 
-    @Test
+    @org.junit.jupiter.api.Test
     void isDynamicRequest() {
         String uri1 = "/post.html";
         assertEquals(false, workThread.isDynamicRequest(uri1));
@@ -111,7 +111,7 @@ class WorkThreadTest {
         assertEquals(true, workThread.isDynamicRequest(uri2));
     }
 
-    @Test
+    @org.junit.jupiter.api.Test
     void tool() {
 
 //        for (int i = 0; i < features.size(); i++) {

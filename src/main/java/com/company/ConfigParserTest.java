@@ -10,7 +10,7 @@ class ConfigParserTest {
 
     private ConfigParser configParser = new ConfigParser();
 
-    @Test
+    @org.junit.jupiter.api.Test
     void parse() {
 
         HashMap<String, HashMap> config1 = new HashMap<>();
