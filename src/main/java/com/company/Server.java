@@ -9,7 +9,16 @@ public class Server {
 
     public static void main(String[] args) {
         String configFile = "";
+//        System.out.println(args);
         String defaultConfigFile = "/Users/cg/data/code/wheel/java/demo/html/config.json";
+        if(args.length == 0){
+           configFile = defaultConfigFile;
+        }else{
+            configFile = args[0];
+        }
+
+        System.out.println(configFile);
+
         ConfigParser configParser = new ConfigParser();
         File file = new File(configFile);
         if (!file.exists()) {
