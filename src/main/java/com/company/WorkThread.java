@@ -12,7 +12,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.StringTokenizer;
 
-public class WorkThread extends Thread{
+public class WorkThread implements Runnable{
     private String webServerRoot;
     private Socket socket;
     private HashMap<String, String> serverConfig;

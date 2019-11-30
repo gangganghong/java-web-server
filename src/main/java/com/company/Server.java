@@ -4,6 +4,8 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public class Server {
 
@@ -40,6 +42,7 @@ public class Server {
     private class VirtualMachineThread extends Thread {
 
         private HashMap<String, String> serverConfig;
+        private Executor executor = Executors.newFixedThreadPool(4);
 
         public VirtualMachineThread(HashMap<String, String> serverConfig) {
             this.serverConfig = serverConfig;
@@ -54,7 +57,7 @@ public class Server {
                 while (true) {
                     Socket socket = serverSocket.accept();
                     if (socket != null) {
-                        new WorkThread(socket, serverConfig).start();
+                        executor.execute(new WorkThread(socket, serverConfig));
                     }
                 }
             } catch (IOException e) {
@@ -62,6 +65,4 @@ public class Server {
             }
         }
     }
-
-
 }
