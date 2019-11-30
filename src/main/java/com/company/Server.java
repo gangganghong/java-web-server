@@ -54,7 +54,7 @@ public class Server {
                 while (true) {
                     Socket socket = serverSocket.accept();
                     if (socket != null) {
-                        new WorkThread(socket, serverConfig).run();
+                        new WorkThread(socket, serverConfig).start();
                     }
                 }
             } catch (IOException e) {

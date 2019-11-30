@@ -12,7 +12,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.StringTokenizer;
 
-public class WorkThread {
+public class WorkThread extends Thread{
     private String webServerRoot;
     private Socket socket;
     private HashMap<String, String> serverConfig;
@@ -31,7 +31,7 @@ public class WorkThread {
 //        public void WorkThread(Socket socket){
 //            this.socket = socket;
 //        }
-
+    @Override
     public void run() {
         try {
             System.out.println("socket info start");
