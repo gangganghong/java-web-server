@@ -32,6 +32,7 @@ public class ServerLog {
 
         } catch (Exception e) {
             e.printStackTrace();
+            return;
         } finally {
             try {
                 if (fileWriter != null) {

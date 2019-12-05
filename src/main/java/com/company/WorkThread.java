@@ -176,9 +176,6 @@ public class WorkThread implements Runnable{
                     byte[] allData = new byte[allDataTmp.remaining()];
                     allDataTmp.get(allData);
                     String proxyPass = serverConfig.get("proxy_pass");
-                    System.out.println("proxy start");
-                    System.out.println(Thread.currentThread().getName() + "\t" + proxyPass);
-                    System.out.println("proxy end");
                     if (proxyPass != null) {
                         proxy(allData, socket, proxyPass, header);
                     } else {
@@ -367,6 +364,7 @@ public class WorkThread implements Runnable{
             stringBuffer.append("HTTP/1.1 " + httpStatus + "\r\n");
             stringBuffer.append("Content-Length:" + contentLength + "\r\n");
             stringBuffer.append("Content-Type:" + contentType + "\r\n");
+            stringBuffer.append("Set-cookie: id=\"34294\"\r\n");
             stringBuffer.append("\r\n");
             stringBuffer.append(html);
             outputStream.write(stringBuffer.toString().getBytes());
