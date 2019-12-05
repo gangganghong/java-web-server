@@ -1,6 +1,9 @@
 package com.company;
 
 
+import org.apache.log4j.Logger;
+import org.apache.log4j.spi.LoggerFactory;
+
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -12,10 +15,13 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.StringTokenizer;
 
-public class WorkThread implements Runnable{
+public class WorkThread implements Runnable {
     private String webServerRoot;
     private Socket socket;
     private HashMap<String, String> serverConfig;
+
+    //    private static Logger logger = Logger.getLogger(WorkThread.class);
+    private static Logger logger = Logger.getLogger("RFA");
 
     public WorkThread() {
 
@@ -27,23 +33,23 @@ public class WorkThread implements Runnable{
         webServerRoot = serverConfig.get("root");
     }
 
-//        错误
+    //        错误
 //        public void WorkThread(Socket socket){
 //            this.socket = socket;
 //        }
     @Override
     public void run() {
         try {
-            System.out.println("socket info start");
-            System.out.println(socket.getPort());
-            System.out.println("socket info end");
+            logger.info("socket info start");
+            logger.info(socket.getPort());
+            logger.info("socket info end");
 
             InputStream inputStream = socket.getInputStream();
             byte[] buffer = new byte[1];
             int bufferLen;
 
             FileOutputStream fileOutputStream = null;
-            FileOutputStream fileOutputStream1 = new FileOutputStream(webServerRoot + "/log" + System.currentTimeMillis());
+//            FileOutputStream fileOutputStream1 = new FileOutputStream(webServerRoot + "/log" + System.currentTimeMillis());
 
             boolean in = false;
             StringBuffer stringBuffer = new StringBuffer();
@@ -67,7 +73,7 @@ public class WorkThread implements Runnable{
             while ((bufferLen = inputStream.read(buffer)) != -1) {
                 allDataTmp.put(buffer);
 
-                fileOutputStream1.write(buffer);
+//                fileOutputStream1.write(buffer);
 
                 String lineStr = new String();
                 String line = new String(buffer, 0, bufferLen);
@@ -191,8 +197,8 @@ public class WorkThread implements Runnable{
             inputStream.close();
             socket.close();
 
-            System.out.println("结束");
-            System.out.println(fileMetas);
+            logger.debug("over");
+            logger.debug(fileMetas);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -255,10 +261,12 @@ public class WorkThread implements Runnable{
         String html = null;
         String contenType = "";
         String httpCode = "200";
+        String header = "";
         if (dataFromPHP != null) {
             html = dataFromPHP.get("content");
             contenType = dataFromPHP.get("ContentType");
             httpStatus = dataFromPHP.get("httpStatus");
+            header = dataFromPHP.get("header");
             String[] httpStatusArr = httpStatus.split(" ");
             if (httpStatusArr.length > 0) {
                 httpCode = httpStatusArr[0];
@@ -273,8 +281,13 @@ public class WorkThread implements Runnable{
         StringBuffer stringBuffer = new StringBuffer();
         stringBuffer.append("HTTP/1.1 " + httpStatus + lineFlag);
         stringBuffer.append("Content-Length: " + contentLength + lineFlag);
-        stringBuffer.append("Content-Type: " + contenType + lineFlag);
-        stringBuffer.append("Connection: closed" + lineFlag);
+        if (header.equals("")) {
+            stringBuffer.append("Content-Type: " + contenType + lineFlag);
+            stringBuffer.append("Connection: closed" + lineFlag);
+        } else {
+            stringBuffer.append(header);
+        }
+
         stringBuffer.append("" + lineFlag);
         stringBuffer.append(html == null ? "" : html);
 
@@ -291,7 +304,7 @@ public class WorkThread implements Runnable{
                        HashMap<String, String> headerLine,
                        String host
     ) throws IOException {
-        System.out.println("GET 请求\t" + filename);
+        logger.info("GET 请求\t" + filename);
 
         StringBuffer stringBuffer = new StringBuffer();
         OutputStream outputStream = socket.getOutputStream();
@@ -354,18 +367,22 @@ public class WorkThread implements Runnable{
         } else {
             String html = dataFromPHP.get("content");
             String contentType = dataFromPHP.get("ContentType");
-
+            String header = dataFromPHP.get("header");
             String httpStatus = dataFromPHP.get("httpStatus");
             if (httpStatus == null) {
                 httpStatus = "HTTP/1.1 200 OK";
+            }else {
+                httpStatus = "HTTP/1.1 " + httpStatus;
             }
 
             int contentLength = html.getBytes().length;
-            stringBuffer.append("HTTP/1.1 " + httpStatus + "\r\n");
+            stringBuffer.append(httpStatus + "\r\n");
             stringBuffer.append("Content-Length:" + contentLength + "\r\n");
-            stringBuffer.append("Content-Type:" + contentType + "\r\n");
-            stringBuffer.append("Set-cookie: id=\"34294\"\r\n");
-            stringBuffer.append("\r\n");
+            stringBuffer.append("Date: Thu, 05 Dec 2019 07:32:00 GMT\r\n");
+            stringBuffer.append(header);
+//            stringBuffer.append("Content-Type:" + contentType + "\r\n");
+//            stringBuffer.append("Set-cookie: id=\"34294\"\r\n");
+            stringBuffer.append("\r\n\r\n");
             stringBuffer.append(html);
             outputStream.write(stringBuffer.toString().getBytes());
 

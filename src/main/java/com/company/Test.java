@@ -31,6 +31,7 @@ public class Test {
         String uri = requestHeaders.get("Uri");
         String contentType = headLine.get("Content-Type");
         String contentLength = headLine.get("Content-Length");
+        String cookie = headLine.get("Cookie");
 
         Map<String, String> params = new LinkedHashMap<>();
         params.put("GATEWAY_INTERFACE", "FastCGI/1.0");
@@ -48,6 +49,9 @@ public class Test {
         params.put("SERVER_NAME", "DESKTOP-NCL22GF");
         params.put("SERVER_PROTOCOL", "HTTP/1.1");
         params.put("CONTENT_TYPE", contentType == null ? "" : contentType);
+        if(cookie != null){
+            params.put("HTTP_COOKIE", cookie);
+        }
 
         params.put("CONTENT_LENGTH", "" + (contentLength == null ? 0 : contentLength));
         params.put("AUTHOR", "cg");
@@ -119,8 +123,8 @@ public class Test {
         byteBuffer.get(data);
 
         String resultFromPHP = new String(data, "UTF-8");
-        // System.out.println(resultFromPHP);
-        // System.out.println("from php end\t结束");
+        System.out.println(resultFromPHP);
+        System.out.println("from php end\t结束");
         int headerEndIndex = resultFromPHP.indexOf("\r\n\r\n");
         String headerStr = resultFromPHP.substring(0, headerEndIndex);
         String[] headerArr = headerStr.split("\r\n");
@@ -129,10 +133,24 @@ public class Test {
         String powered;
         String phpDataContentType;
 
+//        X-Powered-By: PHP/7.2.12
+//        Set-Cookie: PHPSESSID=g5mnrgc5l9buk7pokpilu53upe; path=/
+//        Expires: Thu, 19 Nov 1981 08:52:00 GMT
+//        Cache-Control: no-store, no-cache, must-revalidate
+//        Pragma: no-cache
+//        Content-type: text/html; charset=UTF-8
+
         if (headerArr.length > 2) {
 //            Primary script unknown\nStatus: 404 Not Found
-            httpStatus = headerArr[0].split(":")[1];
+            String[] statusArr = headerArr[0].split(":");
+            if(statusArr[0].contains("Status")){
+                httpStatus = headerArr[0].split(":")[1];
+            }else{
+                httpStatus = null;
+            }
+
             powered = headerArr[1];
+            // 不正确，暂不理会，因为在外面直接使用了php-fpm返回的header响应头部
             phpDataContentType = headerArr[2].split(":")[1];
 //            phpDataContentType = headerArr[3].split(":")[1];
         } else {
@@ -146,6 +164,7 @@ public class Test {
         result.put("powered", powered);
         result.put("ContentType", phpDataContentType);
         result.put("content", content);
+        result.put("header", headerStr);
 
         return result;
     }
