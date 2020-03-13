@@ -9,15 +9,15 @@ public class ServerLog {
     public static void accessLog(HashMap<String, String> logContent, String logFilename) {
         String host = logContent.get("host");
         String date = logContent.get("date");
-        ;
+
         String requestLine = logContent.get("requestLine");
-        ;
+
         String httpCode = logContent.get("httpCode");
-        ;
+
         String contentLength = logContent.get("contentLength");
-        ;
+
         String userAgent = logContent.get("userAgent");
-        ;
+
 
         String logFormat = "%s - - [%s] \"%s\" %s %s \"-\" \"%s\"\"-\"\"-\"-0.000-\n";
         String log = String.format(logFormat, host, date, requestLine, httpCode, contentLength, userAgent);
@@ -29,6 +29,7 @@ public class ServerLog {
             // 文件追加
             fileWriter = new FileWriter(logFilename, true);
             fileWriter.write(log);
+//            fileWriter.flush();
 
         } catch (Exception e) {
             e.printStackTrace();

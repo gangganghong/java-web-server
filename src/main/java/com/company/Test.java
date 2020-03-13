@@ -92,13 +92,9 @@ public class Test {
         onePacket.put(end_request);
 
         onePacket.flip();
-        // System.out.println("\nall:\n" + onePacket);
-
         out.write(onePacket.array());
 
-        // System.out.println("\noutput:");
         byte[] buf = new byte[8];
-
         boolean startContent = false;
         ByteBuffer byteBuffer = ByteBuffer.allocate(1024 * 1024);
         while (in.read(buf) != -1) {
@@ -116,7 +112,7 @@ public class Test {
             }
 
         }
-        // System.out.println("from php start");
+
 //        这个方法，留意
         byteBuffer.flip();
         byte[] data = new byte[byteBuffer.remaining()];
