@@ -69,7 +69,9 @@ public class Test {
         byte[] fcgi_params_end = fcgi.fcgiPacket(fcgi_request_type.FCGI_PARAMS, request_id, new byte[0]);
         // System.out.println("\nFCGI_PARAMS end with empty content:\n" + Base64.getEncoder().encodeToString(fcgi_params_end));
         //3.stdin
-        byte[] fcgi_stdin = fcgi.fcgiPacket(fcgi_request_type.FCGI_STDIN, request_id, postDatByte);
+		byte[] postDatByte2 = new byte[1];
+		postDatByte2[0] = 0;
+        byte[] fcgi_stdin = fcgi.fcgiPacket(fcgi_request_type.FCGI_STDIN, request_id, postDatByte2);
         // System.out.println("\nFCGI_STDIN:\n" + Base64.getEncoder().encodeToString(fcgi_stdin));
 
         byte[] end_request_body = new byte[8];
@@ -89,6 +91,20 @@ public class Test {
 
         onePacket.flip();
         // System.out.println("\nall:\n" + onePacket);
+
+		// test
+		FileOutputStream fileOutputStream = new FileOutputStream("/Users/cg/data/code/wheel/java/demo/html/log/data.log");
+		String dataStr = "{";
+		byte[] data2 = onePacket.array();
+		System.out.println("==========data2.length start=========");
+		System.out.println(data2.length);
+		System.out.println("==========data2.length end=========");
+		for(int i = 0; i<data2.length;i++){
+			dataStr += data2[i];
+			dataStr += ",";
+		}
+		dataStr += "}";
+		fileOutputStream.write(dataStr.getBytes());
 
         out.write(onePacket.array());
 
